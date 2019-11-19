@@ -6,3 +6,6 @@ Thumbs.db
 *.py[cod]
 
 env/
+
+data/
+savedModels/
