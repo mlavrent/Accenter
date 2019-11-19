@@ -13,8 +13,10 @@ matplotlib==3.1.1
 numpy==1.16.4
 opt-einsum==3.1.0
 protobuf==3.10.0
+pydub==0.23.1
 pyparsing==2.4.5
 python-dateutil==2.8.1
+scipy==1.3.2
 six==1.13.0
 tb-nightly==1.15.0a20190806
 tensorflow==2.0.0rc0
