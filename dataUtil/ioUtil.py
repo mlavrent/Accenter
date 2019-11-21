@@ -32,7 +32,7 @@ def plot_audio_segment(sample_rate, data, overlayed=False, ranges=None,
     plt.show()
 
 
-def export_segmented_audio_wav(audio_clips, filename, sample_rate):
+def export_segmented_audio_wav(audio_clips, filename, label, sample_rate):
     for i, segment in enumerate(audio_clips):
-        wavfile.write("./data/{0}-clip{1}.wav".format(filename, i),
-                      sample_rate, segment)
+        wavfile.write("./data/processed/{0}/clips/{1}-clip{2}.wav".format(
+            label, filename, i), sample_rate, segment)

@@ -1,5 +1,7 @@
 import numpy as np
+import glob
 import math
+import ntpath
 import scipy.io as sio
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
@@ -43,26 +45,37 @@ def merge_audio_clips(data, ranges, sample_rate):
     return np.asarray(segmented)
 
 
-def process_audio_file(filepath, savefile):
+def process_audio_file(filepath, label, export=False):
     if filepath.lower().endswith(".wav"):
-        filename = filepath.split(".wav")[0].split("/")[-1]
+        filename = ntpath.basename(filepath)
         # Sampling rate, given in Hz, is number of measurements per second
         sample_rate, data = sio.wavfile.read(filepath)
-        non_silent_ranges = get_non_silent_ranges(filepath, 240)
-        # Multiply second * sample rate to get number of frames in raw WAV data
-        # plot_audio_segment(sample_rate, data[:130 * sample_rate],
-        #                    overlayed=True,
-        #                    ranges=non_silent_ranges,
-        #                    filename=filepath.split(".wav")[0] + "-segmented"
-        #                                                         "-plot2")
-        merged = merge_audio_clips(data, non_silent_ranges, sample_rate)
-        export_segmented_audio_wav(merged[:3], filename, sample_rate)
-        export_audio_data(savefile, merged)
+        non_silent_ranges = get_non_silent_ranges(filepath, 120)
 
+        # Merge audio data by non_silent_ranges
+        merged = merge_audio_clips(data, non_silent_ranges, sample_rate)
+        if export:
+            export_segmented_audio_wav(merged, filename, label, sample_rate)
+        return merged
     else:
         print("File format not recognized.")
         exit(1)
 
 
+def process_audio_directory(path, label, export=False):
+    wav_files = [f for f in glob.glob(path + "**/*.wav", recursive=False)]
+    audio_data = []
+    for f in wav_files:
+        audio_data.append(process_audio_file(f, label, export))
+    audio_data = np.concatenate(audio_data)
+    if export:
+        filename = "./data/processed/{0}/{1}".format(label, ntpath.basename(path))
+        export_audio_data(filename, audio_data)
+    return audio_data
+
+
 if __name__ == '__main__':
-    process_audio_file("./data/raw/english1.wav", "./data/processed/test1.npy")
+    a = process_audio_directory("./data/raw/english", "english", True)
+    print(a.shape)
+    b = read_audio_data("./data/processed/english/english.npy")
+    print(b.shape)
