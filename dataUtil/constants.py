@@ -1,2 +1,2 @@
 MS = 1000
-SEG_LEN = 2.0
+SEG_LEN = 2.5
