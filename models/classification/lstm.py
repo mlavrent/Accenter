@@ -2,9 +2,9 @@ import tensorflow as tf
 import tensorflow.keras as k
 
 
-class ClassifyCNN(k.Model):
+class ClassifyLSTM(k.Model):
     def __init__(self, accent_classes):
-        super(ClassifyCNN, self).__init__()
+        super(ClassifyLSTM, self).__init__()
 
         self.accent_classes = accent_classes
         self.num_accent_classes = len(self.accent_classes)
