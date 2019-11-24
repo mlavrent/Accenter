@@ -9,8 +9,14 @@ from ioUtil import *
 from constants import *
 
 
+def flatten_audio_channels(data):
+    batchSize = data.shape[0]
+    transposed = np.transpose(data, axes=(0, 2, 1))
+    return np.reshape(transposed, (batchSize, -1, ))
+
+
 def get_non_silent_ranges(filepath, audio_length, silence_length=1000,
-                          silence_thresh=-48):
+                          silence_thresh=-52):
     """
     Given a filepath to a .wav file and a target audio length, return all the
     non-silent ranges from the audio sample
@@ -27,8 +33,16 @@ def get_non_silent_ranges(filepath, audio_length, silence_length=1000,
     audio_file = AudioSegment.from_wav(filepath)
     audio_file = audio_file[:audio_length * MS]
     # Use given parameters to return non_silent ranges
-    ranges = detect_nonsilent(audio_file, min_silence_len=silence_length,
-                              silence_thresh=silence_thresh)
+    ranges = []
+    for i in range(10):
+        ranges = detect_nonsilent(audio_file, min_silence_len=silence_length,
+                                  silence_thresh=silence_thresh)
+        if len(ranges) > 0:
+            return ranges
+        else:
+            silence_length /= 2
+    print(filepath)
+    print(silence_length * 2)
     return ranges
 
 
@@ -109,7 +123,7 @@ def process_audio_file(filepath, label, export=False):
 
         # Sampling rate, given in Hz, is number of measurements per second
         sample_rate, data = sio.wavfile.read(filepath)
-        non_silent_ranges = get_non_silent_ranges(filepath, 120)
+        non_silent_ranges = get_non_silent_ranges(filepath, 12)
         # Segment audio data by non_silent_ranges
         segmented = segment_audio_clips(data, non_silent_ranges, sample_rate)
         if export:
@@ -140,7 +154,7 @@ def process_audio_directory(path, label, export=False):
     for f in wav_files:
         # Get parsed audio data for each file
         audio_data.append(process_audio_file(f, label, export=False))
-    audio_data = np.concatenate(audio_data)
+    audio_data = flatten_audio_channels(np.concatenate(audio_data))
     if export:
         filename = "./data/processed/{0}/{1}".format(label, ntpath.basename(path))
         export_audio_data(filename, audio_data)
@@ -148,17 +162,17 @@ def process_audio_directory(path, label, export=False):
 
 
 if __name__ == '__main__':
-    a = process_audio_directory("./data/raw/english", "english", True)
-    print(a.shape)
-    b = read_audio_data("./data/processed/english/english.npy")
-    print(b.shape)
+    # a = process_audio_directory("./data/raw/english", "english", True)
+    # print(a.shape)
+    # b = read_audio_data("./data/processed/english/english.npy")
+    # print(b.shape)
 
     a = process_audio_directory("./data/raw/chinese", "chinese", True)
     print(a.shape)
     b = read_audio_data("./data/processed/chinese/chinese.npy")
     print(b.shape)
-
-    a = process_audio_directory("./data/raw/british", "british", True)
-    print(a.shape)
-    b = read_audio_data("./data/processed/british/british.npy")
-    print(b.shape)
+    #
+    # a = process_audio_directory("./data/raw/british", "british", True)
+    # print(a.shape)
+    # b = read_audio_data("./data/processed/british/british.npy")
+    # print(b.shape)
