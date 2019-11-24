@@ -107,7 +107,7 @@ def segment_audio_clips(data, ranges, sample_rate):
     return np.asarray(segmented)
 
 
-def process_audio_file(filepath, label, export=False):
+def process_audio_file(filepath, label, export=False, testing=False):
     """
     Processes a single audio file given a filepath to the audio data.
     Accepted data forms: .wav
@@ -123,20 +123,20 @@ def process_audio_file(filepath, label, export=False):
 
         # Sampling rate, given in Hz, is number of measurements per second
         sample_rate, data = sio.wavfile.read(filepath)
-        non_silent_ranges = get_non_silent_ranges(filepath, 12)
+        audio_length = 12 if testing else len(data)
+
+        non_silent_ranges = get_non_silent_ranges(filepath, audio_length)
         # Segment audio data by non_silent_ranges
         segmented = segment_audio_clips(data, non_silent_ranges, sample_rate)
         if export:
             export_segmented_audio_wav(segmented, filename, label, sample_rate)
-            plot_audio_segment(sample_rate, ranges=non_silent_ranges,
-                               data=data[:120 * sample_rate], filename=filename)
         return segmented
     else:
         print("File format not recognized.")
         exit(1)
 
 
-def process_audio_directory(path, label, export=False):
+def process_audio_directory(path, label, export=False, testing=False):
     """
     Process all audio files from a given path to the directory. Combines all
     processed audio data from each file into one 3D Numpy array containing
@@ -153,7 +153,9 @@ def process_audio_directory(path, label, export=False):
     audio_data = []
     for f in wav_files:
         # Get parsed audio data for each file
-        audio_data.append(process_audio_file(f, label, export=False))
+        audio_data.append(process_audio_file(f, label,
+                                             export=export,
+                                             testing=testing))
     audio_data = flatten_audio_channels(np.concatenate(audio_data))
     if export:
         filename = "./data/processed/{0}/{1}".format(label, ntpath.basename(path))
@@ -162,17 +164,17 @@ def process_audio_directory(path, label, export=False):
 
 
 if __name__ == '__main__':
-    # a = process_audio_directory("./data/raw/english", "english", True)
-    # print(a.shape)
-    # b = read_audio_data("./data/processed/english/english.npy")
-    # print(b.shape)
+    a = process_audio_directory("./data/raw/english", "english", True, True)
+    print(a.shape)
+    b = read_audio_data("./data/processed/english/english.npy")
+    print(b.shape)
 
-    a = process_audio_directory("./data/raw/chinese", "chinese", True)
+    a = process_audio_directory("./data/raw/chinese", "chinese", True, True)
     print(a.shape)
     b = read_audio_data("./data/processed/chinese/chinese.npy")
     print(b.shape)
-    #
-    # a = process_audio_directory("./data/raw/british", "british", True)
-    # print(a.shape)
-    # b = read_audio_data("./data/processed/british/british.npy")
-    # print(b.shape)
+
+    a = process_audio_directory("./data/raw/british", "british", True, True)
+    print(a.shape)
+    b = read_audio_data("./data/processed/british/british.npy")
+    print(b.shape)
