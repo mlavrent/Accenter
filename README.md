@@ -25,6 +25,7 @@ task and contain subdirectories `clip` within each of their processed folders.
 
 ### Dependencies
 `pydub` throws warnings without an installation of `ffmpeg`, tools for manipulating multimedia files.
+Visit the `pydub` [repository](https://github.com/jiaaro/pydub#getting-ffmpeg-set-up) to properly set up `ffmpeg`.
 
 ## Classification
 
