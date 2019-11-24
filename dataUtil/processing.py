@@ -10,6 +10,15 @@ from constants import *
 
 
 def flatten_audio_channels(data):
+    """
+    Flatten the audio data with multiple channels by concatenating the data from
+    multiple channels
+
+    :param data:            processed audio data of shape
+                            [num_examples, SEGMENT_LENGTH * sample_rate, 2]
+    :return: Numpy array    flattened audio data of shape
+                            [num_examples, SEGMENT_LENGTH * sample_rate * 2]
+    """
     batchSize = data.shape[0]
     transposed = np.transpose(data, axes=(0, 2, 1))
     return np.reshape(transposed, (batchSize, -1, ))
@@ -35,14 +44,14 @@ def get_non_silent_ranges(filepath, audio_length, silence_length=1000,
     # Use given parameters to return non_silent ranges
     ranges = []
     for i in range(10):
-        ranges = detect_nonsilent(audio_file, min_silence_len=silence_length,
+        ranges = detect_nonsilent(audio_file,
+                                  min_silence_len=int(silence_length),
                                   silence_thresh=silence_thresh)
         if len(ranges) > 0:
             return ranges
         else:
             silence_length /= 2
     print(filepath)
-    print(silence_length * 2)
     return ranges
 
 
@@ -115,6 +124,7 @@ def process_audio_file(filepath, label, export=False, testing=False):
     :param filepath:        string representing filepath to audio data
     :param label:           accent speech label
     :param export:          Boolean value whether to export the processed data
+    :param testing:         Boolean value whether to run as testing
     :return: Numpy array    segmented audio data with shape
                             [num_examples, SEGMENT_LENGTH * sample_rate, 2]
     """
@@ -123,6 +133,7 @@ def process_audio_file(filepath, label, export=False, testing=False):
 
         # Sampling rate, given in Hz, is number of measurements per second
         sample_rate, data = sio.wavfile.read(filepath)
+        print("File: {} | Sample Rate: {}".format(filepath, sample_rate))
         audio_length = 12 if testing else len(data)
 
         non_silent_ranges = get_non_silent_ranges(filepath, audio_length)
@@ -145,8 +156,9 @@ def process_audio_directory(path, label, export=False, testing=False):
     :param path:            path to a directory containing audio data
     :param label:           accent speech label
     :param export:          Boolean value whether to export the processed data
+    :param testing:         Boolean value whether to run as testing
     :return: Numpy array    segmented audio data with shape
-                            [num_examples, SEGMENT_LENGTH * sample_rate, 2]
+                            [num_examples, SEGMENT_LENGTH * sample_rate * 2]
     """
     # Read all .wav files in provided directory
     wav_files = [f for f in glob.glob(path + "**/*.wav", recursive=False)]
@@ -158,7 +170,8 @@ def process_audio_directory(path, label, export=False, testing=False):
                                              testing=testing))
     audio_data = flatten_audio_channels(np.concatenate(audio_data))
     if export:
-        filename = "./data/processed/{0}/{1}".format(label, ntpath.basename(path))
+        filename = "./data/processed/{0}/{1}".format(
+            label, ntpath.basename(path))
         export_audio_data(filename, audio_data)
     return audio_data
 
