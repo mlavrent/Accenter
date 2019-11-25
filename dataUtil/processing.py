@@ -14,7 +14,7 @@ from constants import *
 
 def flatten_audio_channels(data):
     """
-    Flatten the audio data with multiple channels by concatenating the data from
+    Flatten the audio data with multiple channels by averaging the data from
     multiple channels
 
     :param data:            processed audio data of shape
@@ -22,9 +22,7 @@ def flatten_audio_channels(data):
     :return: Numpy array    flattened audio data of shape
                             [num_examples, SEGMENT_LENGTH * sample_rate * 2]
     """
-    batchSize = data.shape[0]
-    transposed = np.transpose(data, axes=(0, 2, 1))
-    return np.reshape(transposed, (batchSize, -1,))
+    return np.mean(data, axis=2)
 
 
 def get_non_silent_ranges(filepath, audio_length, silence_length,
@@ -146,6 +144,8 @@ def process_audio_file(filepath, label, silence_length, silence_thresh,
                                                   silence_thresh)
         # Segment audio data by non_silent_ranges
         segmented = segment_audio_clips(data, non_silent_ranges, sample_rate)
+        if sample_rate == 2 * SAMPLE_RATE:
+            segmented = segmented[:, ::2, :]
         if testing:
             io.export_segmented_audio_wav(segmented, path.stem, label,
                                           sample_rate)
