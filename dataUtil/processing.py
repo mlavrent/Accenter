@@ -1,17 +1,20 @@
-import numpy as np
 import glob
 import math
 import ntpath
+
 import scipy.io as sio
+import numpy as np
+import ioUtil as io
+
+from pathlib import Path
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
-from ioUtil import *
 from constants import *
 
 
 def flatten_audio_channels(data):
     """
-    Flatten the audio data with multiple channels by concatenating the data from
+    Flatten the audio data with multiple channels by averaging the data from
     multiple channels
 
     :param data:            processed audio data of shape
@@ -19,13 +22,11 @@ def flatten_audio_channels(data):
     :return: Numpy array    flattened audio data of shape
                             [num_examples, SEGMENT_LENGTH * sample_rate * 2]
     """
-    batchSize = data.shape[0]
-    transposed = np.transpose(data, axes=(0, 2, 1))
-    return np.reshape(transposed, (batchSize, -1, ))
+    return np.mean(data, axis=2)
 
 
-def get_non_silent_ranges(filepath, audio_length, silence_length=1000,
-                          silence_thresh=-52):
+def get_non_silent_ranges(filepath, audio_length, silence_length,
+                          silence_thresh):
     """
     Given a filepath to a .wav file and a target audio length, return all the
     non-silent ranges from the audio sample
@@ -48,10 +49,9 @@ def get_non_silent_ranges(filepath, audio_length, silence_length=1000,
                                   min_silence_len=int(silence_length),
                                   silence_thresh=silence_thresh)
         if len(ranges) > 0:
-            return ranges
+            break
         else:
             silence_length /= 2
-    print(filepath)
     return ranges
 
 
@@ -102,7 +102,7 @@ def segment_audio_clips(data, ranges, sample_rate):
     segmented = []
     for start, end in ranges:
         # Convert start, end (in seconds) to f_start, f_end (in frames)
-        f_start, f_end = int((start / MS) * sample_rate),\
+        f_start, f_end = int((start / MS) * sample_rate), \
                          int((end / MS) * sample_rate)
         # Slice raw audio data to non_silent segment
         seg = data[f_start:f_end]
@@ -116,47 +116,59 @@ def segment_audio_clips(data, ranges, sample_rate):
     return np.asarray(segmented)
 
 
-def process_audio_file(filepath, label, export=False, testing=False):
+def process_audio_file(filepath, label, silence_length, silence_thresh,
+                       testing=False):
     """
     Processes a single audio file given a filepath to the audio data.
     Accepted data forms: .wav
 
     :param filepath:        string representing filepath to audio data
     :param label:           accent speech label
-    :param export:          Boolean value whether to export the processed data
+    :param silence_length:  minimum length of a silence to be used for
+                                a split
+    :param silence_thresh:  (in dBFS) anything quieter than this will be
+                                considered silence
     :param testing:         Boolean value whether to run as testing
     :return: Numpy array    segmented audio data with shape
                             [num_examples, SEGMENT_LENGTH * sample_rate, 2]
     """
-    if filepath.lower().endswith(".wav"):
-        filename = ntpath.basename(filepath).split(".wav")[0]
-
+    path = Path(filepath)
+    if path.suffix == '.wav':
         # Sampling rate, given in Hz, is number of measurements per second
         sample_rate, data = sio.wavfile.read(filepath)
         print("File: {} | Sample Rate: {}".format(filepath, sample_rate))
         audio_length = 12 if testing else len(data)
 
-        non_silent_ranges = get_non_silent_ranges(filepath, audio_length)
+        non_silent_ranges = get_non_silent_ranges(filepath, audio_length,
+                                                  silence_length,
+                                                  silence_thresh)
         # Segment audio data by non_silent_ranges
         segmented = segment_audio_clips(data, non_silent_ranges, sample_rate)
-        if export:
-            export_segmented_audio_wav(segmented, filename, label, sample_rate)
+        if sample_rate == 2 * SAMPLE_RATE:
+            segmented = segmented[:, ::2, :]
+        if testing:
+            io.export_segmented_audio_wav(segmented, path.stem, label,
+                                          sample_rate)
         return segmented
     else:
         print("File format not recognized.")
         exit(1)
 
 
-def process_audio_directory(path, label, export=False, testing=False):
+def process_accent_group(path, label, testing=False, silence_length=1000,
+                         silence_thresh=-52):
     """
     Process all audio files from a given path to the directory. Combines all
-    processed audio data from each file into one 3D Numpy array containing
+    processed audio data from each file into one 2D Numpy array containing
     all audio data for a given accent group
 
     :param path:            path to a directory containing audio data
     :param label:           accent speech label
-    :param export:          Boolean value whether to export the processed data
     :param testing:         Boolean value whether to run as testing
+    :param silence_length:  minimum length of a silence to be used for
+                                a split
+    :param silence_thresh:  (in dBFS) anything quieter than this will be
+                                considered silence
     :return: Numpy array    segmented audio data with shape
                             [num_examples, SEGMENT_LENGTH * sample_rate * 2]
     """
@@ -165,29 +177,50 @@ def process_audio_directory(path, label, export=False, testing=False):
     audio_data = []
     for f in wav_files:
         # Get parsed audio data for each file
-        audio_data.append(process_audio_file(f, label,
-                                             export=export,
-                                             testing=testing))
-    audio_data = flatten_audio_channels(np.concatenate(audio_data))
-    if export:
-        filename = "./data/processed/{0}/{1}".format(
-            label, ntpath.basename(path))
-        export_audio_data(filename, audio_data)
+        processed = process_audio_file(f, label, silence_length, silence_thresh,
+                                       testing=testing)
+        if len(processed) > 0:
+            audio_data.append(processed)
+    # Make sure audio data exists
+    if len(audio_data) > 0:
+        audio_data = flatten_audio_channels(np.concatenate(audio_data))
+        # Always export the audio data to a .npy file
+        filename = "./data/processed/{0}/{1}".format(label, Path(path).stem)
+        io.export_audio_data(filename, audio_data)
+    return audio_data
+
+
+def process_audio_directory(path, testing=False, silence_length=1000,
+                            silence_thresh=-52):
+    """
+    Process an entire file directory of audio files where each subdirectory
+    contains audio data for a given accent class
+
+    :param path:            path to a directory containing audio data
+    :param testing:         Boolean value whether to run as testing
+    :param silence_length:  minimum length of a silence to be used for
+                                a split
+    :param silence_thresh:  (in dBFS) anything quieter than this will be
+                                considered silence
+    :return: dict           dictionary of key values pairs of the form
+                    {accent: [num_examples, SEGMENT_LENGTH * sample_rate * 2]}
+
+    """
+    classes = glob.glob(path + "/*")
+    audio_data = {}
+    for c in classes:
+        p = Path(c)
+        audio_data[p.stem] = process_accent_group(c, p.stem, testing=testing,
+                                                  silence_length=silence_length,
+                                                  silence_thresh=silence_thresh)
     return audio_data
 
 
 if __name__ == '__main__':
-    a = process_audio_directory("./data/raw/english", "english", True, True)
-    print(a.shape)
-    b = read_audio_data("./data/processed/english/english.npy")
-    print(b.shape)
+    a = process_audio_directory("./data/raw", testing=True)
 
-    a = process_audio_directory("./data/raw/chinese", "chinese", True, True)
-    print(a.shape)
-    b = read_audio_data("./data/processed/chinese/chinese.npy")
-    print(b.shape)
-
-    a = process_audio_directory("./data/raw/british", "british", True, True)
-    print(a.shape)
-    b = read_audio_data("./data/processed/british/british.npy")
-    print(b.shape)
+    for k, v, in a.items():
+        print(k)
+        print(v.shape)
+        print(io.read_audio_data("./data/processed/{0}/{0}.npy"
+                                 .format(k)).shape)
