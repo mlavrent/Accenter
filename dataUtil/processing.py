@@ -4,10 +4,9 @@ import math
 import scipy.io as sio
 import numpy as np
 import ioUtil as io
-import librosa as lib
 
-from argparse import ArgumentParser
 from pathlib import Path
+from librosa import load
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
 from constants import *
@@ -143,7 +142,7 @@ def process_audio_file(filepath, label, silence_length, silence_thresh,
             _, data = sio.wavfile.read(filepath)
 
         print("File: {} | Sample Rate: {}".format(filepath, sample_rate))
-        audio_length = TESTING_LENGTH if testing else len(data)
+        audio_length = NUM_TESTING_CLIPS if testing else len(data)
 
         non_silent_ranges = get_non_silent_ranges(filepath, audio_length,
                                                   silence_length,
@@ -221,8 +220,17 @@ def process_audio_directory(path, testing=False, silence_length=1000,
 
 
 def resample_wav_file(filepath, testing=False):
-    duration = TESTING_LENGTH if testing else None
-    data, _ = lib.load(filepath, mono=False, duration=duration)
+    """
+    Resamples a wav file to the standard sampling rate of 22050. Renames the
+    original file with a '_ORIGINAL' filename and write the newly generated
+    .wav file to the original filepath.
+
+    :param filepath:        path to a wav file of audio to be resampled
+    :param testing:         Boolean value whether to run as testing
+    :return: None
+    """
+    duration = NUM_TESTING_CLIPS if testing else None
+    data, _ = load(filepath, mono=False, duration=duration)
     p = Path(filepath)
     p.rename(Path(p.parent, f"{p.stem}_ORIGINAL{p.suffix}"))
     sio.wavfile.write(filepath, SAMPLE_RATE, data.T)
