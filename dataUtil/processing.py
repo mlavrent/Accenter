@@ -1,11 +1,12 @@
 import glob
 import math
-import ntpath
 
 import scipy.io as sio
 import numpy as np
 import ioUtil as io
+import librosa as lib
 
+from argparse import ArgumentParser
 from pathlib import Path
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
@@ -136,19 +137,22 @@ def process_audio_file(filepath, label, silence_length, silence_thresh,
     if path.suffix == '.wav':
         # Sampling rate, given in Hz, is number of measurements per second
         sample_rate, data = sio.wavfile.read(filepath)
+        if sample_rate != SAMPLE_RATE:
+            print("ERROR: Invalid sample rate detected. Resampling file")
+            resample_wav_file(filepath, testing=testing)
+            _, data = sio.wavfile.read(filepath)
+
         print("File: {} | Sample Rate: {}".format(filepath, sample_rate))
-        audio_length = 12 if testing else len(data)
+        audio_length = TESTING_LENGTH if testing else len(data)
 
         non_silent_ranges = get_non_silent_ranges(filepath, audio_length,
                                                   silence_length,
                                                   silence_thresh)
         # Segment audio data by non_silent_ranges
-        segmented = segment_audio_clips(data, non_silent_ranges, sample_rate)
-        if sample_rate == 2 * SAMPLE_RATE:
-            segmented = segmented[:, ::2, :]
-        if testing:
-            io.export_segmented_audio_wav(segmented, path.stem, label,
-                                          sample_rate)
+        segmented = segment_audio_clips(data, non_silent_ranges, SAMPLE_RATE)
+        # if testing:
+        io.export_segmented_audio_wav(segmented, path.stem, label,
+                                      SAMPLE_RATE)
         return segmented
     else:
         print("File format not recognized.")
@@ -216,7 +220,16 @@ def process_audio_directory(path, testing=False, silence_length=1000,
     return audio_data
 
 
+def resample_wav_file(filepath, testing=False):
+    duration = TESTING_LENGTH if testing else None
+    data, _ = lib.load(filepath, mono=False, duration=duration)
+    p = Path(filepath)
+    p.rename(Path(p.parent, f"{p.stem}_ORIGINAL{p.suffix}"))
+    sio.wavfile.write(filepath, SAMPLE_RATE, data.T)
+
+
 if __name__ == '__main__':
+    # resample_wav_file("./data/raw/british/british1.wav", testing=False)
     a = process_audio_directory("./data/raw", testing=True)
 
     for k, v, in a.items():
