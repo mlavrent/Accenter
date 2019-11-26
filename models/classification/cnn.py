@@ -9,37 +9,38 @@ class ClassifyCNN(k.Model):
         self.accent_classes = accent_classes
         self.num_accent_classes = len(self.accent_classes)
 
-        # TODO: set up layers here
-        self.conv1 = k.layers.Conv2D(filters=...,
-                                     kernel_size=...,
-                                     strides=...,
-                                     padding="SAME",
-                                     activation=...,
-                                     use_bias=True,
-                                     kernel_initializer=...)
-        self.conv2 = k.layers.Conv2D(filters=...,
-                                     kernel_size=...,
-                                     strides=...,
-                                     padding="SAME",
-                                     activation=...,
-                                     use_bias=True,
-                                     kernel_initializer=...)
-        self.conv3 = k.layers.Conv2D(filters=...,
-                                     kernel_size=...,
-                                     strides=...,
-                                     padding="SAME",
-                                     activation=...,
-                                     use_bias=True,
-                                     kernel_initializer=...)
+        self.optimizer = k.optimizers.Adam(3e-3)
 
-        self.dense1 = k.layers.Dense(units=...,
-                                     activation=...,
+        self.conv1 = k.layers.Conv2D(filters=8,
+                                     kernel_size=(3, 3),
+                                     strides=(1, 1),
+                                     padding="SAME",
+                                     activation=k.layers.LeakyReLU(0.2),
                                      use_bias=True,
-                                     kernel_initializer=...)
+                                     kernel_initializer=k.initializers.TruncatedNormal(stddev=0.1))
+        self.conv2 = k.layers.Conv2D(filters=16,
+                                     kernel_size=(4, 4),
+                                     strides=(2, 2),
+                                     padding="SAME",
+                                     activation=k.layers.LeakyReLU(0.2),
+                                     use_bias=True,
+                                     kernel_initializer=k.initializers.TruncatedNormal(stddev=0.1))
+        self.conv3 = k.layers.Conv2D(filters=32,
+                                     kernel_size=(4, 4),
+                                     strides=(2, 2),
+                                     padding="SAME",
+                                     activation=k.layers.LeakyReLU(0.2),
+                                     use_bias=True,
+                                     kernel_initializer=k.initializers.TruncatedNormal(stddev=0.1))
+        self.flatten = k.layers.Flatten()
+
+        self.dense1 = k.layers.Dense(units=256,
+                                     activation=k.layers.LeakyReLU(0.2),
+                                     use_bias=True,
+                                     kernel_initializer=k.initializers.TruncatedNormal(stddev=0.1))
         self.dense2 = k.layers.Dense(units=self.num_accent_classes,
-                                     activation=...,
                                      use_bias=True,
-                                     kernel_initializer=...)
+                                     kernel_initializer=k.initializers.TruncatedNormal(stddev=0.1))
 
     @tf.function
     def call(self, inputs):
@@ -48,7 +49,15 @@ class ClassifyCNN(k.Model):
         :param inputs: Tensor or np array of size (batchSize, ..., ..., 1?)
         :return: Tensor of size (batchSize, numAccents) containing logits
         """
-        ...
+        cur_calc = self.conv1(inputs)
+        cur_calc = self.conv2(cur_calc)
+        cur_calc = self.conv3(cur_calc)
+        cur_calc = self.flatten(cur_calc)
+
+        cur_calc = self.dense1(cur_calc)
+        cur_calc = self.dense2(cur_calc)
+
+        return cur_calc
 
     def get_class(self, inp):
         """
