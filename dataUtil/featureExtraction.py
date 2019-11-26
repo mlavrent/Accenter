@@ -1,7 +1,10 @@
+import glob
+
 import matplotlib.pyplot as plt
 import numpy as np
 import ioUtil as io
 
+from pathlib import Path
 from librosa.display import specshow
 from librosa.feature import mfcc
 from scipy.signal import spectrogram as spectro
@@ -66,6 +69,7 @@ def get_mfcc(signals, sampling_frequency, num_fcc, testing=False):
 def plot_spectrogram(times, frequencies, spectrogram):
     """
     Plot the spectrogram.
+
     :param times: an array of size (num_segments,)
     :param frequencies: an array of size (num_frequencies,)
     :param spectrogram: a spectrogram of size (num_segments, num_frequencies)
@@ -80,7 +84,8 @@ def plot_spectrogram(times, frequencies, spectrogram):
 def plot_mfcc(mfcc_data):
     """
     Plot the mfccs.
-    :param mfcc: an array of size (num_segments, num_mfcc)
+
+    :param mfcc_data: an array of size (num_segments, num_mfcc)
     :return: None
     """
     specshow(mfcc_data.T, x_axis='time')
@@ -90,43 +95,39 @@ def plot_mfcc(mfcc_data):
     plt.show()
 
 
+def extract_audio_directory(path, testing=False):
+    """
+    Extract features for an entire file directory of audio data where each
+    subdirectory contains a single .npy file of processed data
+
+    :param path:            path to a directory containing audio data
+    :param testing:         Boolean value whether to run as testing
+    :return: dict           dictionary of key values pairs of the form
+            {accent: [num_examples, num_features, SEGMENT_LENGTH * sample_rate]}
+
+    """
+    classes = glob.glob(path + "/*")
+    audio_data = {}
+    for c in classes:
+        p = Path(c)
+        npy_root = f"{c}/{p.stem}"
+        data = io.read_audio_data(npy_root + ".npy").astype(np.float32)
+        _, _, spectrogram = get_fft(data, SAMPLE_RATE, testing=testing)
+        mfccs = get_mfcc(data, SAMPLE_RATE, NUM_FFC, testing=testing)
+
+        io.export_audio_data(npy_root + "-spectrogram.npy", spectrogram)
+        io.export_audio_data(npy_root + "-mfcc.npy", mfccs)
+
+        audio_data[p.stem] = (spectrogram, mfccs)
+    return audio_data
+
+
 def main():
-    a = io.read_audio_data("./data/processed/english/english.npy").astype(
-        np.float32)
-    b = io.read_audio_data("./data/processed/chinese/chinese.npy").astype(
-        np.float32)
-    c = io.read_audio_data("./data/processed/british/british.npy").astype(
-        np.float32)
+    a = extract_audio_directory("./data/processed", testing=True)
 
-    segment_times1, sample_frequencies1, spectrogram1 = get_fft(a,
-                                                                SAMPLE_RATE,
-                                                                testing=False)
-    segment_times2, sample_frequencies2, spectrogram2 = get_fft(b,
-                                                                SAMPLE_RATE,
-                                                                testing=False)
-    segment_times3, sample_frequencies3, spectrogram3 = get_fft(c, SAMPLE_RATE,
-                                                                testing=False)
-
-    mfcc1 = get_mfcc(a, SAMPLE_RATE, 12, testing=False)
-    mfcc2 = get_mfcc(b, SAMPLE_RATE, 12, testing=False)
-    mfcc3 = get_mfcc(c, SAMPLE_RATE, 12, testing=False)
-
-    print(a.shape)
-    print(b.shape)
-    print(c.shape)
-    print()
-    print(spectrogram1.shape)
-    print(spectrogram2.shape)
-    print(spectrogram3.shape)
-    print()
-    print(mfcc1.shape)
-    print(mfcc2.shape)
-    print(mfcc3.shape)
-
-    plot_spectrogram(segment_times1,
-                     sample_frequencies1,
-                     spectrogram1[0])
-    plot_mfcc(mfcc1[0])
+    for k, v, in a.items():
+        print(k.capitalize())
+        print(v[0].shape, v[1].shape)
 
 
 if __name__ == '__main__':
