@@ -59,11 +59,17 @@ def read_args():
                                         "and converting accents in speech.")
     subparsers = parser.add_subparsers()
 
-    # Command for feature extraction - takes input raw data directory and output directory
-    fextr = subparsers.add_parser("fextr", description="Extract features from raw data and "
-                                                       "save to a directory")
-    fextr.add_argument("raw_data_dir", nargs=1, default="data/raw", type=valid_directory)
-    fextr.add_argument("out_data_dir", nargs=1, default="data/processed", type=valid_directory)
+    # Command for process data - takes input raw data directory and output directory
+    segment = subparsers.add_parser("segment", description="Segment clips from raw data and "
+                                                           "save to a directory")
+    segment.add_argument("raw_data_dir", nargs=1, default="data/raw", type=valid_directory)
+    segment.add_argument("out_data_dir", nargs=1, default="data/processed", type=valid_directory)
+    segment.add_argument("--sil_len", nargs=1, default=1000, type=int)
+    segment.add_argument("--sil_thres", nargs=1, default=-52, type=int)
+
+    # Command for feature extracting from npy segments file
+    fextr = subparsers.add_parser("fextr", description="Extract features from a segment file")
+    fextr.add_argument("processed_dir", nargs=1, default="data/processed", type=valid_directory)
 
     # Command for training the model - takes in model file and directory with the data
     train = subparsers.add_parser("train", description="Train a model on the given dataset")
@@ -83,3 +89,4 @@ def read_args():
 
     return parser.parse_args()
 
+# process_audio_directory
