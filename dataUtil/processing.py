@@ -5,6 +5,7 @@ import scipy.io as sio
 import numpy as np
 import ioUtil as io
 
+from tqdm import trange
 from pathlib import Path
 from librosa import load
 from pydub import AudioSegment
@@ -141,9 +142,7 @@ def process_audio_file(filepath, label, silence_length, silence_thresh,
             resample_wav_file(filepath, testing=testing)
             _, data = sio.wavfile.read(filepath)
 
-        print("File: {} | Sample Rate: {}".format(filepath, sample_rate))
         audio_length = NUM_TESTING_CLIPS if testing else len(data)
-
         non_silent_ranges = get_non_silent_ranges(filepath, audio_length,
                                                   silence_length,
                                                   silence_thresh)
@@ -159,7 +158,7 @@ def process_audio_file(filepath, label, silence_length, silence_thresh,
 
 
 def process_accent_group(path, label, testing=False, silence_length=1000,
-                         silence_thresh=-52):
+                         silence_thresh=-62):
     """
     Process all audio files from a given path to the directory. Combines all
     processed audio data from each file into one 2D Numpy array containing
@@ -173,12 +172,13 @@ def process_accent_group(path, label, testing=False, silence_length=1000,
     :param silence_thresh:  (in dBFS) anything quieter than this will be
                                 considered silence
     :return: Numpy array    segmented audio data with shape
-                            [num_examples, SEGMENT_LENGTH * sample_rate * 2]
+                            [num_examples, SEGMENT_LENGTH * sample_rate]
     """
     # Read all .wav files in provided directory
     wav_files = [f for f in glob.glob(path + "**/*.wav", recursive=False)]
     audio_data = []
-    for f in wav_files:
+    for i in trange(len(wav_files), desc=f"{label.capitalize()}"):
+        f = wav_files[i]
         # Get parsed audio data for each file
         processed = process_audio_file(f, label, silence_length, silence_thresh,
                                        testing=testing)
@@ -188,13 +188,13 @@ def process_accent_group(path, label, testing=False, silence_length=1000,
     if len(audio_data) > 0:
         audio_data = flatten_audio_channels(np.concatenate(audio_data))
         # Always export the audio data to a .npy file
-        filename = "./data/processed/{0}/{1}".format(label, Path(path).stem)
+        filename = f"./data/processed/{label}/{Path(path).stem}"
         io.export_audio_data(filename, audio_data)
     return audio_data
 
 
 def process_audio_directory(path, testing=False, silence_length=1000,
-                            silence_thresh=-52):
+                            silence_thresh=-62):
     """
     Process an entire file directory of audio files where each subdirectory
     contains audio data for a given accent class
@@ -206,16 +206,16 @@ def process_audio_directory(path, testing=False, silence_length=1000,
     :param silence_thresh:  (in dBFS) anything quieter than this will be
                                 considered silence
     :return: dict           dictionary of key values pairs of the form
-                    {accent: [num_examples, SEGMENT_LENGTH * sample_rate * 2]}
+                    {accent: [num_examples, SEGMENT_LENGTH * sample_rate]}
 
     """
     classes = glob.glob(path + "/*")
     audio_data = {}
     for c in classes:
         p = Path(c)
-        audio_data[p.stem] = process_accent_group(c, p.stem, testing=testing,
-                                                  silence_length=silence_length,
-                                                  silence_thresh=silence_thresh)
+        audio_data[p.stem] = process_accent_group(
+            c, p.stem, testing=testing, silence_length=silence_length,
+            silence_thresh=silence_thresh)
     return audio_data
 
 
@@ -236,12 +236,15 @@ def resample_wav_file(filepath, testing=False):
     sio.wavfile.write(filepath, SAMPLE_RATE, data.T)
 
 
-if __name__ == '__main__':
+def main():
     # resample_wav_file("./data/raw/british/british1.wav", testing=False)
     a = process_audio_directory("./data/raw", testing=True)
 
     for k, v, in a.items():
-        print(k)
-        print(v.shape)
-        print(io.read_audio_data("./data/processed/{0}/{0}.npy"
-                                 .format(k)).shape)
+        assert(v.shape == io.read_audio_data(
+            f"./data/processed/{k}/{k}.npy").shape)
+        print(f"{k.capitalize()}: {v.shape}")
+
+
+if __name__ == '__main__':
+    main()
