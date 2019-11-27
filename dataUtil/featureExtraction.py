@@ -123,7 +123,7 @@ def extract_audio_directory(path, testing=False):
 
 
 def main():
-    a = extract_audio_directory("./data/processed", testing=True)
+    a = extract_audio_directory("./data/processed", testing=False)
 
     for k, v, in a.items():
         print(k.capitalize())

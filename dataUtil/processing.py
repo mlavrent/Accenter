@@ -238,7 +238,7 @@ def resample_wav_file(filepath, testing=False):
 
 def main():
     # resample_wav_file("./data/raw/british/british1.wav", testing=False)
-    a = process_audio_directory("./data/raw", testing=True)
+    a = process_audio_directory("./data/raw", testing=False)
 
     for k, v, in a.items():
         assert(v.shape == io.read_audio_data(
