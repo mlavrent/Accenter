@@ -41,15 +41,15 @@ def read_args():
         if valid_model_file(model_file) and os.path.exists(model_file):
             return model_file
         else:
-            raise ArgumentTypeError(f"Invalid or nonexistant model file given: {model_file}")
+            raise ArgumentTypeError(f"Invalid or nonexistent model file given: {model_file}")
 
     def recording_file(rec_file):
         """
-        Function to check that recording file is an exsiting valid .wav file.
+        Function to check that recording file is an existing valid .wav file.
         :param rec_file: name of recording to check for validity
         :return: recording file name if valid, ArgumentTypeError if invalid
         """
-        if os.path_exists(rec_file) and rec_file.endswith(".wav"):
+        if os.path.exists(rec_file) and rec_file.endswith(".wav"):
             return rec_file
         else:
             raise ArgumentTypeError(f"Invalid recording file (must be .wav): {rec_file}")
@@ -65,7 +65,7 @@ def read_args():
     segment.add_argument("raw_data_dir", nargs=1, default="data/raw", type=valid_directory)
     segment.add_argument("out_data_dir", nargs=1, default="data/processed", type=valid_directory)
     segment.add_argument("--sil_len", nargs=1, default=1000, type=int)
-    segment.add_argument("--sil_thres", nargs=1, default=-52, type=int)
+    segment.add_argument("--sil_thres", nargs=1, default=-62, type=int)
 
     # Command for feature extracting from npy segments file
     fextr = subparsers.add_parser("fextr", description="Extract features from a segment file")
