@@ -3,14 +3,14 @@ import math
 
 import scipy.io as sio
 import numpy as np
-import ioUtil as io
+import dataUtil.ioUtil as io
 
 from tqdm import trange
 from pathlib import Path
 from librosa import load
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
-from constants import *
+from dataUtil.constants import *
 
 
 def flatten_audio_channels(data):

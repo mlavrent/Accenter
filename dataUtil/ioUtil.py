@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
 import numpy as np
-from constants import *
+from dataUtil.constants import *
 from scipy.io import wavfile
 
 
