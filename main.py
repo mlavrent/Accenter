@@ -89,4 +89,27 @@ def read_args():
 
     return parser.parse_args()
 
-# process_audio_directory
+
+def process_audio():
+    ...
+
+
+def extract_features():
+    ...
+
+
+def train():
+    ...
+
+
+def test():
+    ...
+
+
+def evaluate():
+    ...
+
+
+if __name__ == "__main__":
+    args = read_args()
+    print(args)
