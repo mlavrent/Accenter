@@ -27,6 +27,9 @@ task and contain subdirectories `clip` within each of their processed folders.
 `pydub` throws warnings without an installation of `ffmpeg`, tools for manipulating multimedia files.
 Visit the `pydub` [repository](https://github.com/jiaaro/pydub#getting-ffmpeg-set-up) to properly set up `ffmpeg`.
 
+Use `pipreqs .` to generate `requirements.txt` based on all imports with versions used in import statements in the
+project. 
+
 ## Classification
 
 ## Conversion
