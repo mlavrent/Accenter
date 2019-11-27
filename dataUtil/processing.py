@@ -5,8 +5,8 @@ import ntpath
 import scipy.io as sio
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
-from ioUtil import *
-from constants import *
+from dataUtil.ioUtil import *
+from dataUtil.constants import *
 
 
 def flatten_audio_channels(data):
