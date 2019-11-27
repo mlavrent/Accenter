@@ -10,8 +10,8 @@
     <script src="https://unpkg.com/tippy.js@4"></script>
 
     <!--  Normalize CSS  -->
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/external/normalize.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/external/html5bp.css') }}">
+<!--    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/external/normalize.css') }}">-->
+<!--    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/external/html5bp.css') }}">-->
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/main.css') }}">
 
     <!--  Font Awesome and Google Fonts  -->
@@ -24,8 +24,26 @@
     <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
 </head>
 <body>
-    <div class="center-container">
-        Hello World!
+    <div class="container">
+        <h1 style="margin-bottom: 0;">Accenter</h1>
+        <img class="divider" src="{{ url_for('static', filename = 'images/divider.png') }}">
+        <h4>A deep learning program for classifying and converting accents in speech</h4>
+    </div>
+    <div class="container">
+        <div id="controls">
+            <div id="microphone">
+                <button onclick="toggleRecording()" class="mic_btn">
+                    <i id="mic" class="fas fa-microphone"></i>
+                </button>
+                <div>
+                    <p id="show_rec_status" style="visibility:hidden">Recording...</p>
+                    <p style="font-size: 12px;">Recording as WAV file</p>
+                </div>
+                <div>
+                    <audio controls id="playback" src="" type="audio/wav"></audio>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 </html>
