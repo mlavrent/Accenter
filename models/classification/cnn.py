@@ -8,8 +8,10 @@ class ClassifyCNN(k.Model):
 
         self.accent_classes = accent_classes
         self.num_accent_classes = len(self.accent_classes)
+        self.type = "classifier"
 
         self.optimizer = k.optimizers.Adam(3e-3)
+        self.batch_size = 100
 
         self.conv1 = k.layers.Conv2D(filters=8,
                                      kernel_size=(3, 3),

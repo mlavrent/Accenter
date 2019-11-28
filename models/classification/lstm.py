@@ -8,6 +8,10 @@ class ClassifyLSTM(k.Model):
 
         self.accent_classes = accent_classes
         self.num_accent_classes = len(self.accent_classes)
+        self.type = "classifier"
+
+        self.optimizer = k.optimizers.Adam(3e-3)
+        self.batch_size = 100
 
         # TODO: set up layers here
 
