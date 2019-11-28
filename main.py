@@ -1,5 +1,9 @@
 from argparse import ArgumentParser, ArgumentTypeError
 import os
+import tensorflow as tf
+
+from models.classification.cnn import ClassifyCNN
+from models.classification.lstm import ClassifyLSTM
 
 
 def read_args():
@@ -98,18 +102,54 @@ def extract_features():
     ...
 
 
-def train():
-    ...
+def train(model, epochs, train_data_dir, save_file=None):
+    """
+    Trains the model on the given training data, checkpointing the weights to the given file
+    after every epoch.
+    :param model: The model to train.
+    :param epochs: Number of epochs to train for.
+    :param train_data_dir: A directory of the training data to use
+    :param save_file: The file to save the model weights to.
+    :return: The trained model
+    """
+
+    # TODO: parse the train_data directory and get data and labels
+
+    for e in range(epochs):
+
+        for batch_start in range(0, dataset_size, model.batch_size):
+            batch_inputs = train_inputs[batch_start:batch_start + model.batch_size]
+            batch_labels = train_labels[batch_start:batch_start + model.batch_size]
+
+            with tf.GradientTape() as tape:
+                loss = model.loss(batch_inputs, batch_labels)
+
+            grads = tape.gradient(loss, model.trainable_variables)
+            model.optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+        # Save the model at the end of the epoch
+        if save_file:
+            model.save_weights(save_file, save_format="h5")
 
 
 def test():
     ...
 
 
-def evaluate():
-    ...
+def evaluate(model, input_audio):
+    if model.type == "classifier":
+        # TODO: preprocess and feature extract the input audio
+        model.get_class(...)
+    elif model.type == "converter":
+        ...
+    else:
+        print("Model type not recognized")
 
 
 if __name__ == "__main__":
     args = read_args()
-    print(args)
+
+    accent_classes = ["british", "chinese", "american", "korean"]
+    model = ClassifyCNN(accent_classes)
+
+    # TODO: implement loading, etc.
