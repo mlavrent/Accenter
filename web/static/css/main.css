@@ -20,6 +20,8 @@ input {
     letter-spacing: 0.5px;
 }
 
+audio,
+i,
 a,
 img,
 select,
@@ -70,8 +72,16 @@ h4 {
     font-weight: 500;
 }
 
+h1, h3 {
+    margin-bottom: 0;
+}
+
 .divider {
     width: 50px;
+}
+
+.divider.sub {
+    width: 30px;
 }
 
 .mic_btn {

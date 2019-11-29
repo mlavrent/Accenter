@@ -10,9 +10,13 @@
     <script src="https://unpkg.com/tippy.js@4"></script>
 
     <!--  Normalize CSS  -->
-<!--    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/external/normalize.css') }}">-->
-<!--    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/external/html5bp.css') }}">-->
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/external/normalize.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/external/html5bp.css') }}">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/main.css') }}">
+
+    <!--  Tooltips  -->
+	<script src="https://unpkg.com/popper.js@1/dist/umd/popper.min.js"></script>
+	<script src="https://unpkg.com/tippy.js@4"></script>
 
     <!--  Font Awesome and Google Fonts  -->
     <link rel="stylesheet"
@@ -21,29 +25,36 @@
           crossorigin="anonymous">
     <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700|Nunito:400,600,700"
           rel="stylesheet">
-    <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', filename='images/favicon.jpg') }}">
+
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1 style="margin-bottom: 0;">Accenter</h1>
-        <img class="divider" src="{{ url_for('static', filename = 'images/divider.png') }}">
+        <h1>Accenter</h1>
+        <img class="divider" src="{{ url_for('static', filename='images/divider.png') }}">
         <h4>A deep learning program for classifying and converting accents in speech</h4>
-    </div>
-    <div class="container">
         <div id="controls">
             <div id="microphone">
-                <button onclick="toggleRecording()" class="mic_btn">
-                    <i id="mic" class="fas fa-microphone"></i>
+                <button class="mic_btn">
+                    <i data-tippy-content="Press to toggle recording"
+                       id="mic"
+                       class="fas fa-microphone info"></i>
                 </button>
                 <div>
                     <p id="show_rec_status" style="visibility:hidden">Recording...</p>
                     <p style="font-size: 12px;">Recording as WAV file</p>
                 </div>
                 <div>
-                    <audio controls id="playback" src="" type="audio/wav"></audio>
+                    <audio id="audioPlayer" controls type="audio/wav"></audio>
                 </div>
+                <h3>Accent Classification</h3>
+                    <img class="divider sub" src="{{ url_for('static', filename='images/divider.png') }}">
+                <p id="accentPred"></p>
             </div>
         </div>
     </div>
 </body>
+<script type="text/javascript" src="{{ url_for('static', filename='js/accenter.js') }}"></script>
 </html>
