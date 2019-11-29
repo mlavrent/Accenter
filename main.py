@@ -3,7 +3,9 @@ import os
 import tensorflow as tf
 import numpy as np
 
-from dataUtil import ioUtil as io
+from dataUtil import ioUtil as Io
+from dataUtil import featureExtraction as fExtr
+from dataUtil import processing
 from models.classification.cnn import ClassifyCNN
 from models.classification.lstm import ClassifyLSTM
 
@@ -79,6 +81,7 @@ def read_args():
 
     # Command for training the model - takes in model file and directory with the data
     train = subparsers.add_parser("train", description="Train a model on the given dataset")
+    train.add_argument("epochs", nargs=1, type=int)
     train.add_argument("model_file", nargs=1, type=valid_model_file)
     train.add_argument("data_dir", nargs=1, type=valid_directory)
 
@@ -110,7 +113,7 @@ def get_data_from_dir(data_dir, preprocess_method):
                             if os.path.isdir(os.path.join(data_dir, folder))]
     for folder in accent_class_folders:
         data_file = os.path.join(data_dir, folder, f"{folder}-{preprocess_method}.npy")
-        class_data = io.read_audio_data(data_file)
+        class_data = Io.read_audio_data(data_file)
         class_labels = np.full((class_data.shape[0]), model.accent_classes.index(folder))
 
         if inputs and labels:
@@ -205,4 +208,31 @@ if __name__ == "__main__":
     accent_classes = ["british", "chinese", "american", "korean"]
     model = ClassifyCNN(accent_classes)
 
-    # TODO: implement loading, etc.
+    if args.segment:
+        for accent in accent_classes:
+            accent_data_path = os.path.join(args.raw_data_dir, accent)
+            processing.process_accent_group(accent_data_path, accent)
+
+    elif args.fextr:
+        fExtr.extract_audio_directory(args.processed_dir, testing=False)
+
+    elif args.train:
+        if os.path.exists(args.model_file):
+            model.load_weights(args.model_file)
+        train(model, args.epochs, args.data_dir,
+              save_file=args.model_file, preprocess_method="mfcc")
+
+    elif args.test:
+        print(f"Testing {args.data_dir}")
+        model.load_weights(args.saved_model)
+        accuracy = test(model, args.data_dir)
+        print(f"Accuracy: {accuracy*100:.1f}%")
+
+    elif args.run:
+        print(f"Evaluating {args.recording}")
+        model.load_weights(args.saved_model)
+        accent = classify_accent(model, args.recording)
+        print(f"Predicted class: {accent}")
+
+    else:
+        print("No command entered.")
