@@ -91,17 +91,36 @@ def read_args():
     run = subparsers.add_parser("run", description="Run the model on the given data")
     run.add_argument("saved_model", nargs=1, type=existing_model)
     run.add_argument("--output-file", "-o", nargs="?", default=None, type=str)
-    run.add_argument("recordings", nargs="+", type=recording_file)
+    run.add_argument("recording", nargs="+", type=recording_file)
 
     return parser.parse_args()
 
 
-def process_audio():
-    ...
+def get_data_from_dir(data_dir, preprocess_method):
+    """
+    Loads the data from a given data directory, giving back both inputs and labels
+    :param data_dir: The directory to load data from
+    :param preprocess_method: The method to use for preprocessing (mfcc | fft)
+    :return: The inputs and labels from the data directory
+    """
+    inputs = None
+    labels = None
 
+    accent_class_folders = [folder for folder in os.listdir(data_dir)
+                            if os.path.isdir(os.path.join(data_dir, folder))]
+    for folder in accent_class_folders:
+        data_file = os.path.join(data_dir, folder, f"{folder}-{preprocess_method}.npy")
+        class_data = io.read_audio_data(data_file)
+        class_labels = np.full((class_data.shape[0]), model.accent_classes.index(folder))
 
-def extract_features():
-    ...
+        if inputs and labels:
+            inputs = np.concatenate(inputs, class_data)
+            labels = np.concatenate(labels, class_labels)
+        else:
+            inputs = class_data
+            labels = class_labels
+
+    return inputs, labels
 
 
 def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc"):
@@ -112,25 +131,11 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
     :param epochs: Number of epochs to train for.
     :param train_data_dir: A directory of the training data to use
     :param save_file: The file to save the model weights to.
+    :param preprocess_method: The preprocess method to use for the inputs to the model (mfcc | fft)
     :return: The trained model
     """
 
-    train_inputs = None
-    train_labels = None
-
-    accent_class_folders = [folder for folder in os.listdir(train_data_dir)
-                            if os.path.isdir(os.path.join(train_data_dir, folder))]
-    for folder in accent_class_folders:
-        data_file = os.path.join(train_data_dir, folder, f"{folder}-{preprocess_method}.npy")
-        class_data = io.read_audio_data(data_file)
-        class_labels = np.full((class_data.shape[0]), model.accent_classes.index(folder))
-
-        if train_inputs and train_labels:
-            train_inputs = np.concatenate(train_inputs, class_data)
-            train_labels = np.concatenate(train_labels, class_labels)
-        else:
-            train_inputs = class_data
-            train_labels = class_labels
+    train_inputs, train_labels = get_data_from_dir(train_data_dir, preprocess_method)
 
     assert train_inputs is not None
     assert train_labels is not None
@@ -165,15 +170,29 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
             model.save_weights(save_file, save_format="h5")
 
 
-def test():
-    ...
+def test(model, test_data_dir, preprocess_method="mfcc"):
+    """
+    Runs the model on the test dataset and reports the accuracy on it.
+    :param model: The model to run the test dataset on.
+    :param test_data_dir: The data directory of the test data.
+    :param preprocess_method: The method to use for preprocessing (mfcc | fft)
+    :return: The accuracy on the test dataset.
+    """
+    test_inputs, test_labels = get_data_from_dir(test_data_dir, preprocess_method)
+    return model.accuracy(test_inputs, test_labels)
 
 
-def evaluate(model, input_audio):
+def classify_accent(model, input_audio):
+    """
+    Gets the predicted class for a given audio segment.
+    :param model: The model to use to predict the class.
+    :param input_audio: The audio to predict the accent for.
+    :return: The predicted accent for the given audio.
+    """
     if model.type == "classifier":
         # TODO: preprocess and feature extract the input audio
         fextr_audio = ...
-        model.get_class(fextr_audio)
+        return model.get_class([fextr_audio])
     elif model.type == "converter":
         raise Exception("Model not implemented")
     else:
