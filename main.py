@@ -1,7 +1,9 @@
 from argparse import ArgumentParser, ArgumentTypeError
 import os
 import tensorflow as tf
+import numpy as np
 
+from dataUtil import ioUtil as io
 from models.classification.cnn import ClassifyCNN
 from models.classification.lstm import ClassifyLSTM
 
@@ -102,7 +104,7 @@ def extract_features():
     ...
 
 
-def train(model, epochs, train_data_dir, save_file=None):
+def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc"):
     """
     Trains the model on the given training data, checkpointing the weights to the given file
     after every epoch.
@@ -113,10 +115,36 @@ def train(model, epochs, train_data_dir, save_file=None):
     :return: The trained model
     """
 
-    # TODO: parse the train_data directory and get data and labels
+    train_inputs = None
+    train_labels = None
+
+    accent_class_folders = [folder for folder in os.listdir(train_data_dir)
+                            if os.path.isdir(os.path.join(train_data_dir, folder))]
+    for folder in accent_class_folders:
+        data_file = os.path.join(train_data_dir, folder, f"{folder}-{preprocess_method}.npy")
+        class_data = io.read_audio_data(data_file)
+        class_labels = np.full((class_data.shape[0]), model.accent_classes.index(folder))
+
+        if train_inputs and train_labels:
+            train_inputs = np.concatenate(train_inputs, class_data)
+            train_labels = np.concatenate(train_labels, class_labels)
+        else:
+            train_inputs = class_data
+            train_labels = class_labels
+
+    assert train_inputs is not None
+    assert train_labels is not None
+    assert train_inputs.shape[0] == train_labels.shape[0]
+    dataset_size = train_labels.shape[0]
 
     for e in range(epochs):
 
+        # Shuffle the dataset before each epoch
+        new_order = np.random.permutation(dataset_size)
+        train_inputs = train_inputs[new_order]
+        train_labels = train_labels[new_order]
+
+        # Run training in batches
         for batch_start in range(0, dataset_size, model.batch_size):
             batch_inputs = train_inputs[batch_start:batch_start + model.batch_size]
             batch_labels = train_labels[batch_start:batch_start + model.batch_size]
@@ -126,6 +154,11 @@ def train(model, epochs, train_data_dir, save_file=None):
 
             grads = tape.gradient(loss, model.trainable_variables)
             model.optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+        # Print loss and accuracy
+        epoch_loss = model.loss(train_inputs, train_labels)
+        epoch_acc = model.accuracy(train_inputs, train_labels)
+        print(f"Epoch {e}/{epochs} | Loss: {epoch_loss} | Accuracy: {epoch_acc}")
 
         # Save the model at the end of the epoch
         if save_file:
@@ -139,9 +172,10 @@ def test():
 def evaluate(model, input_audio):
     if model.type == "classifier":
         # TODO: preprocess and feature extract the input audio
-        model.get_class(...)
+        fextr_audio = ...
+        model.get_class(fextr_audio)
     elif model.type == "converter":
-        ...
+        raise Exception("Model not implemented")
     else:
         print("Model type not recognized")
 
