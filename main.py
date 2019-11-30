@@ -185,17 +185,23 @@ def test(model, test_data_dir, preprocess_method="mfcc"):
     return model.accuracy(test_inputs, test_labels)
 
 
-def classify_accent(model, input_audio):
+def classify_accent(model, input_audio, preprocess_method="mfcc"):
     """
     Gets the predicted class for a given audio segment.
     :param model: The model to use to predict the class.
     :param input_audio: The audio to predict the accent for.
+    :param preprocess_method: The method to use for preprocessing (mfcc | spectrogram)
     :return: The predicted accent for the given audio.
     """
     if model.type == "classifier":
-        # TODO: preprocess and feature extract the input audio
-        fextr_audio = ...
-        return model.get_class([fextr_audio])
+        spectrogram, mfccs = fExtr.segment_and_extract(input_audio)
+        if preprocess_method == "mfcc":
+            input_data = mfccs
+        elif preprocess_method == "spectrogram":
+            input_data = spectrogram
+        else:
+            raise Exception("Invalid preprocessing method specified")
+        return model.get_class([input_data])
     elif model.type == "converter":
         raise Exception("Model not implemented")
     else:
