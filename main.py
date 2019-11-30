@@ -220,10 +220,7 @@ if __name__ == "__main__":
     model = ClassifyCNN(accent_classes)
 
     if args.command == "segment":
-        for accent in accent_classes:
-            accent_data_path = os.path.join(args.raw_data_dir, accent)
-            processing.process_accent_group(accent_data_path, accent, silence_length=args.sil_len,
-                                            silence_thresh=args.sil_thresh, testing=True)
+        processing.process_audio_directory(args.raw_data_dir, args.out_data_dir)
 
     elif args.command == "fextr":
         fExtr.extract_audio_directory(args.processed_dir, testing=False)
