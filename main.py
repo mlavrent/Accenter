@@ -103,7 +103,7 @@ def get_data_from_dir(data_dir, preprocess_method):
     """
     Loads the data from a given data directory, giving back both inputs and labels
     :param data_dir: The directory to load data from
-    :param preprocess_method: The method to use for preprocessing (mfcc | fft)
+    :param preprocess_method: The method to use for preprocessing (mfcc | spectrogram)
     :return: The inputs and labels from the data directory
     """
     inputs = None
@@ -134,7 +134,7 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
     :param epochs: Number of epochs to train for.
     :param train_data_dir: A directory of the training data to use
     :param save_file: The file to save the model weights to.
-    :param preprocess_method: The preprocess method to use for the inputs to the model (mfcc | fft)
+    :param preprocess_method: The preprocess method to use for the inputs to the model (mfcc | spectrogram)
     :return: The trained model
     """
 
@@ -178,7 +178,7 @@ def test(model, test_data_dir, preprocess_method="mfcc"):
     Runs the model on the test dataset and reports the accuracy on it.
     :param model: The model to run the test dataset on.
     :param test_data_dir: The data directory of the test data.
-    :param preprocess_method: The method to use for preprocessing (mfcc | fft)
+    :param preprocess_method: The method to use for preprocessing (mfcc | spectrogram)
     :return: The accuracy on the test dataset.
     """
     test_inputs, test_labels = get_data_from_dir(test_data_dir, preprocess_method)
