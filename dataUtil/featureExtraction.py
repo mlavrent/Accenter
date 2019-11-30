@@ -48,7 +48,7 @@ def _get_single_mfcc(signal, sampling_frequency, num_mfcc):
     :param num_mfcc: the number of mfccs to extract
     :return: an array of size (num_segments, num_mfcc)
     """
-    return mfcc(y=signal, sr=sampling_frequency, n_mfcc=num_mfcc).T
+    return mfcc(y=signal, sr=sampling_frequency, n_mfcc=num_mfcc).T[:, 1:]
 
 
 def get_mfcc(signals, sampling_frequency, num_fcc, label, testing=False):
