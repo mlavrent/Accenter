@@ -2,14 +2,15 @@ import glob
 
 import matplotlib.pyplot as plt
 import numpy as np
-import ioUtil as io
 
 from pathlib import Path
 from librosa.display import specshow
 from librosa.feature import mfcc
 from scipy.signal import spectrogram as spectro
 
-from constants import *
+from dataUtil.constants import *
+import dataUtil.ioUtil as io
+
 
 
 def get_fft(signal, sampling_frequency, testing=False):
