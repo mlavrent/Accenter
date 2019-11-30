@@ -8,10 +8,12 @@ from librosa.display import specshow
 from librosa.feature import mfcc
 from scipy.signal import spectrogram as spectro
 from dataUtil.processing import process_audio_file, flatten_audio_channels
+from tqdm import trange
 
 from dataUtil.constants import *
 import dataUtil.ioUtil as io
 
+test_fraction = 0.1
 
 
 def get_fft(signal, sampling_frequency, testing=False):
@@ -49,7 +51,7 @@ def _get_single_mfcc(signal, sampling_frequency, num_mfcc):
     return mfcc(y=signal, sr=sampling_frequency, n_mfcc=num_mfcc).T
 
 
-def get_mfcc(signals, sampling_frequency, num_fcc, testing=False):
+def get_mfcc(signals, sampling_frequency, num_fcc, label, testing=False):
     """
     This function takes in a batch of signals of size (num_batches, num_frames,)
     and returns the mfccs of size (num_batches, num_segments, num_mfcc)
@@ -63,7 +65,8 @@ def get_mfcc(signals, sampling_frequency, num_fcc, testing=False):
     if testing:
         signals = signals[:NUM_TESTING_CLIPS]
     mfccs = []
-    for signal in signals:
+    for i in trange(len(signals), desc=f"{label.capitalize()} MFCC"):
+        signal = signals[i]
         mfccs.append(_get_single_mfcc(signal, sampling_frequency, num_fcc))
     return np.array(mfccs)
 
@@ -113,12 +116,26 @@ def extract_audio_directory(path, testing=False):
     for c in classes:
         p = Path(c)
         npy_root = f"{c}/{p.stem}"
+        print(npy_root)
         data = io.read_audio_data(npy_root + ".npy").astype(np.float32)
+        print("Running FFT")
         _, _, spectrogram = get_fft(data, SAMPLE_RATE, testing=testing)
-        mfccs = get_mfcc(data, SAMPLE_RATE, NUM_FFC, testing=testing)
+        print("Running MFCC")
+        mfccs = get_mfcc(data, SAMPLE_RATE, NUM_FFC, p.stem, testing=testing)
 
-        io.export_audio_data(npy_root + "-spectrogram.npy", spectrogram)
-        io.export_audio_data(npy_root + "-mfcc.npy", mfccs)
+        # Get end index for train using test_fraction
+        end_train_spectro = int(len(spectrogram) * (1 - TEST_FRACTION))
+        end_train_mfcc = int(len(mfccs) * (1 - TEST_FRACTION))
+
+        train_spectro, test_spectro = spectrogram[:end_train_spectro], \
+                                      spectrogram[end_train_spectro:]
+
+        train_mfcc, test_mfcc = mfccs[:end_train_mfcc], mfccs[end_train_mfcc:]
+
+        io.export_audio_data(npy_root + "-spectrogram-train.npy", train_spectro)
+        io.export_audio_data(npy_root + "-spectrogram-test.npy", test_spectro)
+        io.export_audio_data(npy_root + "-mfcc-train.npy", train_mfcc)
+        io.export_audio_data(npy_root + "-mfcc-test.npy", test_mfcc)
 
         audio_data[p.stem] = (spectrogram, mfccs)
     return audio_data
