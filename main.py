@@ -70,29 +70,34 @@ def read_args():
     # Command for process data - takes input raw data directory and output directory
     segment = subparsers.add_parser("segment", description="Segment clips from raw data and "
                                                            "save to a directory")
-    segment.add_argument("raw_data_dir", nargs=1, default="data/raw", type=valid_directory)
-    segment.add_argument("out_data_dir", nargs=1, default="data/processed", type=valid_directory)
-    segment.add_argument("--sil_len", nargs=1, default=1000, type=int)
-    segment.add_argument("--sil_thres", nargs=1, default=-62, type=int)
+    segment.set_defaults(command="segment")
+    segment.add_argument("raw_data_dir", default="data/raw", type=valid_directory)
+    segment.add_argument("out_data_dir", default="data/processed", type=valid_directory)
+    segment.add_argument("--sil_len", default=1000, type=int)
+    segment.add_argument("--sil_thresh", default=-62, type=int)
 
     # Command for feature extracting from npy segments file
     fextr = subparsers.add_parser("fextr", description="Extract features from a segment file")
-    fextr.add_argument("processed_dir", nargs=1, default="data/processed", type=valid_directory)
+    fextr.set_defaults(command="fextr")
+    fextr.add_argument("processed_dir", default="data/processed", type=valid_directory)
 
     # Command for training the model - takes in model file and directory with the data
     train = subparsers.add_parser("train", description="Train a model on the given dataset")
-    train.add_argument("epochs", nargs=1, type=int)
-    train.add_argument("model_file", nargs=1, type=valid_model_file)
-    train.add_argument("data_dir", nargs=1, type=valid_directory)
+    train.set_defaults(command="train")
+    train.add_argument("epochs", type=int)
+    train.add_argument("model_file", type=valid_model_file)
+    train.add_argument("data_dir", type=valid_directory)
 
     # Command for testing the model - takes in model file and directory of test data
     test = subparsers.add_parser("test", description="Evaluate the model on the given data")
-    test.add_argument("saved_model", nargs=1, type=existing_model)
-    test.add_argument("data_dir", nargs=1, type=valid_directory)
+    test.set_defaults(command="test")
+    test.add_argument("saved_model", type=existing_model)
+    test.add_argument("data_dir", type=valid_directory)
 
     # Command for running the model - takes in model file, optional output file, and recordings
     run = subparsers.add_parser("run", description="Run the model on the given data")
-    run.add_argument("saved_model", nargs=1, type=existing_model)
+    run.set_defaults(command="run")
+    run.add_argument("saved_model", type=existing_model)
     run.add_argument("--output-file", "-o", nargs="?", default=None, type=str)
     run.add_argument("recording", nargs="+", type=recording_file)
 
@@ -214,27 +219,28 @@ if __name__ == "__main__":
     accent_classes = ["british", "chinese", "american", "korean"]
     model = ClassifyCNN(accent_classes)
 
-    if args.segment:
+    if args.command == "segment":
         for accent in accent_classes:
             accent_data_path = os.path.join(args.raw_data_dir, accent)
-            processing.process_accent_group(accent_data_path, accent)
+            processing.process_accent_group(accent_data_path, accent, silence_length=args.sil_len,
+                                            silence_thresh=args.sil_thresh, testing=True)
 
-    elif args.fextr:
+    elif args.command == "fextr":
         fExtr.extract_audio_directory(args.processed_dir, testing=False)
 
-    elif args.train:
+    elif args.command == "train":
         if os.path.exists(args.model_file):
             model.load_weights(args.model_file)
         train(model, args.epochs, args.data_dir,
               save_file=args.model_file, preprocess_method="mfcc")
 
-    elif args.test:
+    elif args.command == "test":
         print(f"Testing {args.data_dir}")
         model.load_weights(args.saved_model)
         accuracy = test(model, args.data_dir)
         print(f"Accuracy: {accuracy*100:.1f}%")
 
-    elif args.run:
+    elif args.command == "run":
         print(f"Evaluating {args.recording}")
         model.load_weights(args.saved_model)
         accent = classify_accent(model, args.recording)
