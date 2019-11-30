@@ -149,8 +149,9 @@ def process_audio_file(filepath, label, silence_length, silence_thresh,
         # Segment audio data by non_silent_ranges
         segmented = segment_audio_clips(data, non_silent_ranges, SAMPLE_RATE)
         # if testing:
-        io.export_segmented_audio_wav(segmented, path.stem, label,
-                                      SAMPLE_RATE)
+        if testing:
+            io.export_segmented_audio_wav(segmented, path.stem, label,
+                                          SAMPLE_RATE)
         return segmented
     else:
         print("File format not recognized.")

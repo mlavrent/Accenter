@@ -7,6 +7,7 @@ from pathlib import Path
 from librosa.display import specshow
 from librosa.feature import mfcc
 from scipy.signal import spectrogram as spectro
+from dataUtil.processing import process_audio_file, flatten_audio_channels
 
 from dataUtil.constants import *
 import dataUtil.ioUtil as io
@@ -121,6 +122,17 @@ def extract_audio_directory(path, testing=False):
 
         audio_data[p.stem] = (spectrogram, mfccs)
     return audio_data
+
+
+def segment_and_extract(filepath):
+    processed = process_audio_file(filepath, None, silence_length=1000,
+                                   silence_thresh=-62)
+    if len(processed) == 0:
+        return None, None
+    data = flatten_audio_channels(processed)
+    _, _, spectrogram = get_fft(data, SAMPLE_RATE)
+    mfccs = get_mfcc(data, SAMPLE_RATE, NUM_FFC)
+    return spectrogram, mfccs
 
 
 def main():

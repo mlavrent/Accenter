@@ -35,3 +35,11 @@ project.
 ## Conversion
 
 ## Preprocessing
+
+## Web Application
+A simple Flask web app was built to demo Accenter with custom audio recordings. To start the Flask app, run
+```
+export FLASK_APP=app.py
+flask run
+```
+to start the application locally.
