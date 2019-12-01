@@ -164,6 +164,7 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
     assert train_labels is not None
     assert train_inputs.shape[0] == train_labels.shape[0]
     dataset_size = train_labels.shape[0]
+    print(dataset_size)
 
     for e in range(epochs):
 
@@ -186,7 +187,7 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
         # Print loss and accuracy
         epoch_loss = model.loss(train_inputs, train_labels)
         epoch_acc = model.accuracy(train_inputs, train_labels)
-        print(f"Epoch {e}/{epochs} | Loss: {epoch_loss} | Accuracy: {epoch_acc}")
+        print(f"Epoch {e}/{epochs} | Loss: {epoch_loss:.3f} | Accuracy: {epoch_acc:.3f}")
 
         # Save the model at the end of the epoch
         if save_file:
@@ -228,11 +229,46 @@ def classify_accent(model, input_audio, preprocess_method="mfcc"):
         print("Model type not recognized")
 
 
+def init_model(problem_type, model_type, accent_classes, preprocess_method="mfcc"):
+    """
+    Initializes a model and gets it ready for weight loading.
+    :param problem_type: The problem the model solves (classify | convert)
+    :param model_type: The type of model being used (cnn | lstm)
+    :param accent_classes: List of accent classes that the model will deal with.
+    :param preprocess_method: The preprocessing method to initialize with (mfcc | spectrogram)
+    :return: The initialized model
+    """
+
+    if problem_type == "classify":
+        if model_type == "cnn":
+            model = ClassifyCNN(accent_classes)
+        elif model_type == "lstm":
+            model = ClassifyLSTM(accent_classes)
+        else:
+            raise Exception("Invalid model type for classify. Must be either cnn or lstm")
+
+        if preprocess_method == "mfcc":
+            input_shape = (10, 216, 11, 1)
+        elif preprocess_method == "spectrogram":
+            input_shape = (10, ..., ..., 1)
+        else:
+            raise Exception("Invalid preprocessing method. Must be either mfcc or spectrogram")
+
+        model.call(tf.random.uniform(input_shape))
+
+    elif problem_type == "convert":
+        raise Exception("Conversion model not implemented")
+    else:
+        raise Exception("Invalid problem type. Must be either classify or convert")
+
+    return model
+
+
 if __name__ == "__main__":
     args = read_args()
 
     accent_classes = ["british", "chinese", "american", "korean"]
-    model = ClassifyCNN(accent_classes)
+    model = init_model("classify", "cnn", accent_classes, preprocess_method="mfcc")
 
     if args.command == "segment":
         # Create output directories if they don't exist
