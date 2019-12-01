@@ -110,8 +110,19 @@ def get_data_from_dir(data_dir, preprocess_method, subset):
     :param data_dir: The directory to load data from
     :param preprocess_method: The method to use for preprocessing (mfcc | spectrogram)
     :param subset: The subset of the data to get (train | test)
-    :return: The inputs and labels from the data directory
+    :return: The inputs and labels from the data directory as tensors
     """
+
+    def normalize_tensor(tensor):
+        """
+        Normalizes a tensor to the 0-1 range
+        :param tensor: A tensor of any shape
+        :return: The same tensor, scaled such that all values are between 0 and 1
+        """
+        tens_min = tf.reduce_min(tensor)
+        tens_max = tf.reduce_max(tensor)
+        return tf.divide(tf.subtract(tensor, tens_min), tf.subtract(tens_max, tens_min))
+
     inputs = None
     labels = None
 
@@ -131,7 +142,7 @@ def get_data_from_dir(data_dir, preprocess_method, subset):
             inputs = class_data
             labels = class_labels
 
-    return inputs, labels
+    return normalize_tensor(tf.expand_dims(inputs, -1)), tf.convert_to_tensor(labels)
 
 
 def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc"):
