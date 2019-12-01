@@ -25,7 +25,7 @@ def read_args():
         :return: the directory if valid, ArgumentTypeError if invalid
         """
         if os.path.isdir(directory):
-            return directory
+            return os.path.normpath(directory)
         else:
             raise ArgumentTypeError(f"Invalid directory given: {directory}")
 
@@ -36,7 +36,7 @@ def read_args():
         :return: the file name if valid, ArgumentTypeError if invalid
         """
         if True:  # TODO: figure out file ending
-            return model_file
+            return os.path.normpath(model_file)
         else:
             raise ArgumentTypeError(f"Invalid model file given: {model_file}")
 
@@ -47,7 +47,7 @@ def read_args():
         :return: the model file name if valid, ArgumentTypeError if invalid
         """
         if valid_model_file(model_file) and os.path.exists(model_file):
-            return model_file
+            return os.path.normpath(model_file)
         else:
             raise ArgumentTypeError(f"Invalid or nonexistent model file given: {model_file}")
 
@@ -58,7 +58,7 @@ def read_args():
         :return: recording file name if valid, ArgumentTypeError if invalid
         """
         if os.path.exists(rec_file) and rec_file.endswith(".wav"):
-            return rec_file
+            return os.path.normpath(rec_file)
         else:
             raise ArgumentTypeError(f"Invalid recording file (must be .wav): {rec_file}")
 
