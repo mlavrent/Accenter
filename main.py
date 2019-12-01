@@ -104,11 +104,12 @@ def read_args():
     return parser.parse_args()
 
 
-def get_data_from_dir(data_dir, preprocess_method):
+def get_data_from_dir(data_dir, preprocess_method, subset):
     """
     Loads the data from a given data directory, giving back both inputs and labels
     :param data_dir: The directory to load data from
     :param preprocess_method: The method to use for preprocessing (mfcc | spectrogram)
+    :param subset: The subset of the data to get (train | test)
     :return: The inputs and labels from the data directory
     """
     inputs = None
@@ -117,13 +118,15 @@ def get_data_from_dir(data_dir, preprocess_method):
     accent_class_folders = [folder for folder in os.listdir(data_dir)
                             if os.path.isdir(os.path.join(data_dir, folder))]
     for folder in accent_class_folders:
-        data_file = os.path.join(data_dir, folder, f"{folder}-{preprocess_method}.npy")
-        class_data = Io.read_audio_data(data_file)
-        class_labels = np.full((class_data.shape[0]), model.accent_classes.index(folder))
+        assert folder in model.accent_classes
 
-        if inputs and labels:
-            inputs = np.concatenate(inputs, class_data)
-            labels = np.concatenate(labels, class_labels)
+        data_file = os.path.join(data_dir, folder, f"{folder}-{preprocess_method}-{subset}.npy")
+        class_data = Io.read_audio_data(data_file)
+        class_labels = np.full((class_data.shape[0]), np.where(model.accent_classes == folder)[0])
+
+        if inputs is not None and labels is not None:
+            inputs = np.concatenate((inputs, class_data))
+            labels = np.concatenate((labels, class_labels))
         else:
             inputs = class_data
             labels = class_labels
@@ -143,7 +146,7 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
     :return: The trained model
     """
 
-    train_inputs, train_labels = get_data_from_dir(train_data_dir, preprocess_method)
+    train_inputs, train_labels = get_data_from_dir(train_data_dir, preprocess_method, "train")
 
     assert train_inputs is not None
     assert train_labels is not None
@@ -186,7 +189,7 @@ def test(model, test_data_dir, preprocess_method="mfcc"):
     :param preprocess_method: The method to use for preprocessing (mfcc | spectrogram)
     :return: The accuracy on the test dataset.
     """
-    test_inputs, test_labels = get_data_from_dir(test_data_dir, preprocess_method)
+    test_inputs, test_labels = get_data_from_dir(test_data_dir, preprocess_method, "test")
     return model.accuracy(test_inputs, test_labels)
 
 
@@ -236,7 +239,7 @@ if __name__ == "__main__":
         # Load the saved model or create directory if doesn't exist
         if os.path.exists(args.model_file):
             model.load_weights(args.model_file)
-        else:
+        elif not os.path.exists(os.path.dirname(args.model_file)):
             os.makedirs(os.path.dirname(args.model_file))
 
         train(model, args.epochs, args.data_dir,
