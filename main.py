@@ -220,14 +220,25 @@ if __name__ == "__main__":
     model = ClassifyCNN(accent_classes)
 
     if args.command == "segment":
+        # Create output directories if they don't exist
+        for accent in accent_classes:
+            out_path = os.path.join(args.out_data_dir, accent, "clips")
+            if not os.path.exists(out_path):
+                os.makedirs(out_path)
+
+        # Segment the data
         processing.process_audio_directory(args.raw_data_dir, args.out_data_dir)
 
     elif args.command == "fextr":
         fExtr.extract_audio_directory(args.processed_dir, testing=False)
 
     elif args.command == "train":
+        # Load the saved model or create directory if doesn't exist
         if os.path.exists(args.model_file):
             model.load_weights(args.model_file)
+        else:
+            os.makedirs(os.path.dirname(args.model_file))
+
         train(model, args.epochs, args.data_dir,
               save_file=args.model_file, preprocess_method="mfcc")
 
