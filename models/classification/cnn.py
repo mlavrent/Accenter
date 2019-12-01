@@ -80,7 +80,7 @@ class ClassifyCNN(k.Model):
         :return: 0-1 accuracy value
         """
         predictions = tf.argmax(self.call(inputs), axis=1)
-        return tf.reduce_mean(predictions == labels)
+        return tf.reduce_mean(tf.cast(predictions == labels, tf.float32))
 
     def loss(self, inputs, labels):
         """

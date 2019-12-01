@@ -115,10 +115,11 @@ def get_data_from_dir(data_dir, preprocess_method, subset):
 
     def normalize_tensor(tensor):
         """
-        Normalizes a tensor to the 0-1 range
+        Normalizes a tensor to the 0-1 range and casts it to floats
         :param tensor: A tensor of any shape
         :return: The same tensor, scaled such that all values are between 0 and 1
         """
+        tensor = tf.cast(tensor, tf.float32)
         tens_min = tf.reduce_min(tensor)
         tens_max = tf.reduce_max(tensor)
         return tf.divide(tf.subtract(tensor, tens_min), tf.subtract(tens_max, tens_min))
