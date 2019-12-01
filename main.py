@@ -167,9 +167,9 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
     for e in range(epochs):
 
         # Shuffle the dataset before each epoch
-        new_order = np.random.permutation(dataset_size)
-        train_inputs = train_inputs[new_order]
-        train_labels = train_labels[new_order]
+        new_order = tf.random.shuffle(tf.range(dataset_size))
+        train_inputs = tf.gather(train_inputs, new_order)
+        train_labels = tf.gather(train_labels, new_order)
 
         # Run training in batches
         for batch_start in range(0, dataset_size, model.batch_size):
