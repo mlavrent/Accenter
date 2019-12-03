@@ -120,9 +120,9 @@ def get_data_from_dir(data_dir, preprocess_method, subset):
         :return: The same tensor, scaled such that all values are between 0 and 1
         """
         tensor = tf.cast(tensor, tf.float32)
-        tens_min = tf.reduce_min(tensor)
-        tens_max = tf.reduce_max(tensor)
-        return tf.divide(tf.subtract(tensor, tens_min), tf.subtract(tens_max, tens_min))
+        tens_stddev = tf.math.reduce_std(tensor)
+        tens_mean = tf.reduce_mean(tensor)
+        return tf.divide(tf.subtract(tensor, tens_mean), tens_stddev)
 
     inputs = None
     labels = None
@@ -146,6 +146,15 @@ def get_data_from_dir(data_dir, preprocess_method, subset):
     return normalize_tensor(tf.expand_dims(inputs, -1)), tf.convert_to_tensor(labels)
 
 
+def augment_random_noise(inputs):
+    """
+    Adds random noise from N(0,1) to the inputs (already normalized) to augment data.
+    :param inputs: The input batch.
+    :return: The input batch augmented with noise.
+    """
+    return tf.add(inputs, tf.random.normal(inputs.shape, mean=0.0, stddev=1.0))
+
+
 def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc"):
     """
     Trains the model on the given training data, checkpointing the weights to the given file
@@ -164,7 +173,7 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
     assert train_labels is not None
     assert train_inputs.shape[0] == train_labels.shape[0]
     dataset_size = train_labels.shape[0]
-    print(dataset_size)
+    print(f"Training on {dataset_size} examples")
 
     for e in range(epochs):
 
@@ -175,7 +184,7 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
 
         # Run training in batches
         for batch_start in range(0, dataset_size, model.batch_size):
-            batch_inputs = train_inputs[batch_start:batch_start + model.batch_size]
+            batch_inputs = augment_random_noise(train_inputs[batch_start:batch_start + model.batch_size])
             batch_labels = train_labels[batch_start:batch_start + model.batch_size]
 
             with tf.GradientTape() as tape:
