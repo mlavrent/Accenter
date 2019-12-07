@@ -3,17 +3,15 @@ import glob
 import matplotlib.pyplot as plt
 import numpy as np
 
+from tqdm import trange
 from pathlib import Path
 from librosa.display import specshow
 from librosa.feature import mfcc
 from scipy.signal import spectrogram as spectro
-from dataUtil.processing import process_audio_file, flatten_audio_channels
-from tqdm import trange
+from processing import process_audio_file, flatten_audio_channels
 
-from dataUtil.constants import *
-import dataUtil.ioUtil as io
-
-test_fraction = 0.1
+from constants import *
+import ioUtil as io
 
 
 def get_fft(signal, sampling_frequency, testing=False):
@@ -155,10 +153,10 @@ def segment_and_extract(filepath):
 def main():
     a = extract_audio_directory("./data/processed", testing=False)
 
-    for k, v, in a.items():
-        print(k.capitalize())
-        print(v[0].shape, v[1].shape)
-
+    # for k, v, in a.items():
+    #     print(k.capitalize())
+    #     print(v[0].shape, v[1].shape)
+    # print(io.read_audio_data("./data/processed/spanish/spanish.npy").shape)
 
 if __name__ == '__main__':
     main()

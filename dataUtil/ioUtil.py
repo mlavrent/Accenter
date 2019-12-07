@@ -1,6 +1,6 @@
 from matplotlib import pyplot as plt
 import numpy as np
-from dataUtil.constants import *
+from constants import *
 from scipy.io import wavfile
 
 
@@ -38,7 +38,7 @@ def plot_audio_segment(sample_rate, data, ranges, filename="plot.png"):
     times = np.arange(len(data)) / sample_rate
     plt.figure(figsize=(300, 10))
     plt.xlim(times[0], times[-1])
-    plt.fill_between(times, data[:, 0], data[:, 1], color='k')
+    plt.fill_between(times, data, color='k')
     for start, end in ranges:
         if end / MS < times[-1]:
             plt.axvspan(start / MS, end / MS, alpha=0.2, color='red')
