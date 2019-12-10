@@ -10,17 +10,17 @@ For functions in `dataUtil` to work as intended, the following directory setup i
     ├── ...
     ├── data
     │   ├── processed
-    │   │   ├── english
+    │   │   ├── american
     │   │   │   └── clips
     │   │   ├── chinese
     │   │   └── ...
     │   └── raw
-    │       ├── english
+    │       ├── american
     │       ├── chinese
     │       └── ...
     └── ...
     
-where each of `english`, `chinese`, `british`, etc. are considered "labels" for the classification
+where each of `american`, `chinese`, `british`, etc. are considered "labels" for the classification
 task and contain subdirectories `clip` within each of their processed folders.
 
 ### Dependencies

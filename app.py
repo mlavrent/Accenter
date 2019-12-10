@@ -28,6 +28,6 @@ def classify_accent():
     if spectrogram is None:
         return "ERROR"
     else:
-        accent = np.random.choice(["british", "english", "chinese", "korean"], 1)[0]
+        accent = np.random.choice(["american", "chinese", "korean"], 1)[0]
         print(accent)
         return accent.capitalize()
