@@ -2,6 +2,7 @@ from argparse import ArgumentParser, ArgumentTypeError
 import os
 import tensorflow as tf
 import numpy as np
+from matplotlib import pyplot as plt
 
 from dataUtil import ioUtil as Io
 from dataUtil import featureExtraction as fExtr
@@ -120,9 +121,9 @@ def get_data_from_dir(data_dir, preprocess_method, subset):
         :return: The same tensor, scaled such that all values are between 0 and 1
         """
         tensor = tf.cast(tensor, tf.float32)
-        tens_min = tf.reduce_min(tensor)
-        tens_max = tf.reduce_max(tensor)
-        return tf.divide(tf.subtract(tensor, tens_min), tf.subtract(tens_max, tens_min))
+        tens_stddev = tf.math.reduce_std(tensor)
+        tens_mean = tf.reduce_mean(tensor)
+        return tf.divide(tf.subtract(tensor, tens_mean), tens_stddev)
 
     inputs = None
     labels = None
@@ -146,6 +147,15 @@ def get_data_from_dir(data_dir, preprocess_method, subset):
     return normalize_tensor(tf.expand_dims(inputs, -1)), tf.convert_to_tensor(labels)
 
 
+def augment_random_noise(inputs):
+    """
+    Adds random noise from N(0,1) to the inputs (already normalized) to augment data.
+    :param inputs: The input batch.
+    :return: The input batch augmented with noise.
+    """
+    return tf.add(inputs, tf.random.normal(inputs.shape, mean=0.0, stddev=1.0))
+
+
 def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc"):
     """
     Trains the model on the given training data, checkpointing the weights to the given file
@@ -159,15 +169,32 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
     """
 
     train_inputs, train_labels = get_data_from_dir(train_data_dir, preprocess_method, "train")
+    test_inputs, test_labels = get_data_from_dir(train_data_dir, preprocess_method, "test")
+
+    # train_inputs = tf.concat([train_inputs, augment_random_noise(train_inputs)], 0)
+    # train_labels = tf.concat([train_labels, train_labels], 0)
 
     assert train_inputs is not None
     assert train_labels is not None
     assert train_inputs.shape[0] == train_labels.shape[0]
     dataset_size = train_labels.shape[0]
-    print(dataset_size)
+    print(f"Training on {dataset_size} examples")
+    epoch_loss = model.loss(train_inputs, train_labels)
+    epoch_acc = model.accuracy(train_inputs, train_labels)
+    epoch_acc_test = model.accuracy(test_inputs, test_labels)
+
+    print(f"Baseline_Train | Loss: {epoch_loss:.3f} | Accuracy: {epoch_acc:.3f},"
+          f" {epoch_acc_test:.3f}")
+
+    train_loss = np.zeros([epochs + 1])
+    train_acc = np.zeros([epochs + 1])
+    test_acc = np.zeros([epochs + 1])
+
+    train_loss[0] = epoch_loss
+    train_acc[0] = epoch_acc
+    test_acc[0] = epoch_acc_test
 
     for e in range(epochs):
-
         # Shuffle the dataset before each epoch
         new_order = tf.random.shuffle(tf.range(dataset_size))
         train_inputs = tf.gather(train_inputs, new_order)
@@ -187,11 +214,42 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
         # Print loss and accuracy
         epoch_loss = model.loss(train_inputs, train_labels)
         epoch_acc = model.accuracy(train_inputs, train_labels)
-        print(f"Epoch {e}/{epochs} | Loss: {epoch_loss:.3f} | Accuracy: {epoch_acc:.3f}")
+        epoch_acc_test = model.accuracy(test_inputs, test_labels)
+
+        train_loss[e+1] = epoch_loss
+        train_acc[e+1] = epoch_acc
+        test_acc[e+1] = epoch_acc_test
+
+        print(f"Epoch {e}/{epochs} | Loss: {epoch_loss:.3f}"
+              f"| Accuracy: {epoch_acc:.3f}, {epoch_acc_test:.3f}")
 
         # Save the model at the end of the epoch
         if save_file:
             model.save_weights(save_file, save_format="h5")
+
+        plot_feature(train_acc, test_acc, preprocess_method,
+                     "Accuracy_CNN_MFCC", epochs)
+
+    plot_feature(train_acc, test_acc, preprocess_method,
+                 "Accuracy_CNN_MFCC", epochs, save=True)
+
+    Io.export_audio_data("loss_train.npy", np.asarray(train_loss))
+    Io.export_audio_data("acc_train.npy", np.asarray(train_acc))
+
+    Io.export_audio_data("acc_test.npy", np.asarray(test_acc))
+
+
+def plot_feature(train_data, test_data, preprocess_method, title, epochs,
+                 save=False):
+    plt.plot(np.arange(0, epochs + 1).tolist(), train_data, '-b', label='train')
+    plt.plot(np.arange(0, epochs + 1).tolist(), test_data, '-c', label='test')
+
+    plt.xlabel("n epoch")
+    plt.legend(loc='upper right')
+    plt.title(title)
+    if save:
+        plt.savefig(f"acc_{preprocess_method}_{model.__class__.__name__}.png")
+    plt.show()
 
 
 def test(model, test_data_dir, preprocess_method="mfcc"):
@@ -248,9 +306,9 @@ def init_model(problem_type, model_type, accent_classes, preprocess_method="mfcc
             raise Exception("Invalid model type for classify. Must be either cnn or lstm")
 
         if preprocess_method == "mfcc":
-            input_shape = (10, 216, 11, 1)
+            input_shape = (10, 44, 49, 1)
         elif preprocess_method == "spectrogram":
-            input_shape = (10, ..., ..., 1)
+            input_shape = (10, 98, 70, 1)
         else:
             raise Exception("Invalid preprocessing method. Must be either mfcc or spectrogram")
 
@@ -267,7 +325,7 @@ def init_model(problem_type, model_type, accent_classes, preprocess_method="mfcc
 if __name__ == "__main__":
     args = read_args()
 
-    accent_classes = ["british", "chinese", "american", "korean"]
+    accent_classes = ["chinese", "american", "korean"]
     model = init_model("classify", "cnn", accent_classes, preprocess_method="mfcc")
 
     if args.command == "segment":
