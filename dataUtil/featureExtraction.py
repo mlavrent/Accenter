@@ -3,17 +3,15 @@ import glob
 import matplotlib.pyplot as plt
 import numpy as np
 
+from tqdm import trange
 from pathlib import Path
 from librosa.display import specshow
 from librosa.feature import mfcc
 from scipy.signal import spectrogram as spectro
-from dataUtil.processing import process_audio_file, flatten_audio_channels
-from tqdm import trange
+from processing import process_audio_file, flatten_audio_channels
 
-from dataUtil.constants import *
-import dataUtil.ioUtil as io
-
-test_fraction = 0.1
+from constants import *
+import ioUtil as io
 
 
 def get_fft(signal, sampling_frequency, testing=False):
@@ -121,7 +119,7 @@ def extract_audio_directory(path, testing=False):
         print("Running FFT")
         _, _, spectrogram = get_fft(data, SAMPLE_RATE, testing=testing)
         print("Running MFCC")
-        mfccs = get_mfcc(data, SAMPLE_RATE, NUM_FFC, p.stem, testing=testing)
+        mfccs = get_mfcc(data, SAMPLE_RATE, NUM_MFCC, p.stem, testing=testing)
 
         # Get end index for train using test_fraction
         end_train_spectro = int(len(spectrogram) * (1 - TEST_FRACTION))
@@ -148,17 +146,21 @@ def segment_and_extract(filepath):
         return None, None
     data = flatten_audio_channels(processed)
     _, _, spectrogram = get_fft(data, SAMPLE_RATE)
-    mfccs = get_mfcc(data, SAMPLE_RATE, NUM_FFC)
+    mfccs = get_mfcc(data, SAMPLE_RATE, NUM_MFCC, "NA")
     return spectrogram, mfccs
 
 
 def main():
     a = extract_audio_directory("./data/processed", testing=False)
-
+    f = open("results.txt", 'w')
     for k, v, in a.items():
-        print(k.capitalize())
-        print(v[0].shape, v[1].shape)
+        f.write(f"{k.capitalize()}\n")
+        f.write(f"{v.shape}\n")
 
+    # for k, v, in a.items():
+    #     print(k.capitalize())
+    #     print(v[0].shape, v[1].shape)
+    # print(io.read_audio_data("./data/processed/spanish/spanish.npy").shape)
 
 if __name__ == '__main__':
     main()

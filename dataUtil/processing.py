@@ -1,16 +1,18 @@
 import glob
+import os
+
 import math
 
 import scipy.io as sio
 import numpy as np
-import dataUtil.ioUtil as io
+import ioUtil as io
 
 from tqdm import trange
 from pathlib import Path
 from librosa import load
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
-from dataUtil.constants import *
+from constants import *
 
 
 def flatten_audio_channels(data):
@@ -68,7 +70,10 @@ def pad_audio_clip(clip, sample_rate):
     seg_target_len = SEGMENT_LENGTH * sample_rate
     pad_len = int(seg_target_len - len(clip))
     # Pad the audio clip on the bottom by pad_len
-    return np.pad(clip, ((0, pad_len), (0, 0)), mode='constant')
+    if len(clip.shape) == 2:
+        return np.pad(clip, ((0, pad_len), (0, 0)), mode='constant')
+    else:
+        return np.pad(clip, (pad_len, 0), mode='constant')
 
 
 def split_audio_clip(clip, sample_rate):
@@ -148,7 +153,7 @@ def process_audio_file(filepath, label, silence_length, silence_thresh,
                                                   silence_thresh)
         # Segment audio data by non_silent_ranges
         segmented = segment_audio_clips(data, non_silent_ranges, SAMPLE_RATE)
-        # if testing:
+        # io.plot_audio_segment(SAMPLE_RATE, data, non_silent_ranges)
         if testing:
             io.export_segmented_audio_wav(segmented, path.stem, label,
                                           SAMPLE_RATE)
@@ -184,10 +189,12 @@ def process_accent_group(path, label, testing=False, silence_length=1000,
         processed = process_audio_file(f, label, silence_length, silence_thresh,
                                        testing=testing)
         if len(processed) > 0:
+            if len(np.shape(processed)) > 2:
+                processed = flatten_audio_channels(processed)
             audio_data.append(processed)
     # Make sure audio data exists
     if len(audio_data) > 0:
-        audio_data = flatten_audio_channels(np.concatenate(audio_data))
+        audio_data = np.concatenate(audio_data)
         # Always export the audio data to a .npy file
         filename = f"./data/processed/{label}/{Path(path).stem}"
         io.export_audio_data(filename, audio_data)
@@ -210,13 +217,20 @@ def process_audio_directory(path, testing=False, silence_length=1000,
                     {accent: [num_examples, SEGMENT_LENGTH * sample_rate]}
 
     """
-    classes = glob.glob(path + "/*")
+    classes = glob.glob(path + "/**")
     audio_data = {}
+    res_file = open("results.txt", "w")
+    res_file.write("Segmenting Results\n")
     for c in classes:
+        if not os.path.isdir(c):
+            continue
         p = Path(c)
+        res_file.write(f"{p.stem.capitalize()}\n")
         audio_data[p.stem] = process_accent_group(
             c, p.stem, testing=testing, silence_length=silence_length,
             silence_thresh=silence_thresh)
+        res_file.write(f"{str(audio_data[p.stem].shape)}\n")
+    res_file.close()
     return audio_data
 
 
@@ -231,14 +245,22 @@ def resample_wav_file(filepath, testing=False):
     :return: None
     """
     duration = NUM_TESTING_CLIPS if testing else None
-    data, _ = load(filepath, mono=False, duration=duration)
+    data, _ = load(filepath, sr=SAMPLE_RATE, mono=False, duration=duration)
     p = Path(filepath)
     p.rename(Path(p.parent, f"{p.stem}_ORIGINAL{p.suffix}"))
     sio.wavfile.write(filepath, SAMPLE_RATE, data.T)
 
 
+def resample_wav_dir(path, testing=False):
+    wav_files = [f for f in glob.glob(path + "**/*.wav", recursive=False)]
+    for i in trange(len(wav_files)):
+        sample_rate, data = sio.wavfile.read(wav_files[i])
+        if sample_rate != SAMPLE_RATE:
+            print(f"Resampling {wav_files[i]}")
+            resample_wav_file(wav_files[i], testing=testing)
+
+
 def main():
-    # resample_wav_file("./data/raw/british/british1.wav", testing=False)
     a = process_audio_directory("./data/raw", testing=False)
 
     for k, v, in a.items():

@@ -2,12 +2,13 @@ from argparse import ArgumentParser, ArgumentTypeError
 import os
 import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
+
 
 from dataUtil import ioUtil as Io
 from dataUtil import featureExtraction as fExtr
 from dataUtil import processing
-from models.classification.cnn import ClassifyCNN
+from models.classification.cnn import ClassifyCNN, ClassifyGCNN
 from models.classification.lstm import ClassifyLSTM
 
 
@@ -187,6 +188,15 @@ def batch_generator(inputs, labels, batch_size):
         yield tf.convert_to_tensor(batch_inputs), tf.convert_to_tensor(batch_labels)
 
 
+def augment_random_noise(inputs):
+    """
+    Adds random noise from N(0,1) to the inputs (already normalized) to augment data.
+    :param inputs: The input batch.
+    :return: The input batch augmented with noise.
+    """
+    return tf.add(inputs, tf.random.normal(inputs.shape, mean=0.0, stddev=1.0))
+
+
 def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc"):
     """
     Trains the model on the given training data, checkpointing the weights to the given file
@@ -224,9 +234,8 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
     test_accs.append(test_acc)
     print(f"Baseline | Loss: {epoch_loss:.3f} | Train acc: {epoch_acc:.3f} | "
           f"Test Acc: {test_acc:.3f}")
-
+    
     for e in range(epochs):
-
         # Shuffle the dataset before each epoch
         new_order = tf.random.shuffle(tf.range(dataset_size))
         train_inputs = tf.gather(train_inputs, new_order)
@@ -245,6 +254,7 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
         # Print loss and accuracy
         epoch_loss = model.loss(train_inputs, train_labels)
         epoch_acc = model.accuracy(train_inputs, train_labels)
+
         test_acc = test(model, train_data_dir, preprocess_method=preprocess_method)
         train_accs.append(epoch_acc)
         test_accs.append(test_acc)
@@ -255,8 +265,23 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
         if save_file:
             model.save_weights(save_file, save_format="h5")
 
-    plt.plot(range(epochs + 1), train_accs)
-    plt.plot(range(epochs + 1), test_accs)
+    plot_feature(train_accs, test_accs, preprocess_method,
+                 "Accuracy_CNN_MFCC", epochs, save=True)
+
+    Io.export_audio_data("acc_train.npy", np.asarray(train_accs))
+    Io.export_audio_data("acc_test.npy", np.asarray(test_accs))
+
+
+def plot_feature(train_data, test_data, preprocess_method, title, epochs,
+                 save=False):
+    plt.plot(range(0, epochs + 1), train_data, label='train')
+    plt.plot(range(0, epochs + 1), test_data, label='test')
+
+    plt.xlabel("n epoch")
+    plt.legend(loc='upper right')
+    plt.title(title)
+    if save:
+        plt.savefig(f"acc_{preprocess_method}_{model.__class__.__name__}.png")
     plt.show()
 
 
@@ -317,7 +342,7 @@ def init_model(problem_type, model_type, accent_classes, preprocess_method="mfcc
 
     if problem_type == "classify":
         if model_type == "cnn":
-            model = ClassifyCNN(accent_classes)
+            model = ClassifyGCNN(accent_classes)
         elif model_type == "lstm":
             model = ClassifyLSTM(accent_classes)
         else:
@@ -326,7 +351,7 @@ def init_model(problem_type, model_type, accent_classes, preprocess_method="mfcc
         if preprocess_method == "mfcc":
             input_shape = (model.batch_size, 44, 49, 1)
         elif preprocess_method == "spectrogram":
-            input_shape = (model.batch_size, 10296, 6528, 1)
+            input_shape = (model.batch_size, 98, 70, 1)
         else:
             raise Exception("Invalid preprocessing method. Must be either mfcc or spectrogram")
 
@@ -342,10 +367,11 @@ def init_model(problem_type, model_type, accent_classes, preprocess_method="mfcc
 
 if __name__ == "__main__":
     args = read_args()
-
+    
     accent_classes = ["american", "chinese", "korean"]
     preprocess_method = "mfcc"
     model = init_model("classify", "cnn", accent_classes, preprocess_method=preprocess_method)
+
 
     if args.command == "segment":
         # Create output directories if they don't exist
