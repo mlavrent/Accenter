@@ -12,13 +12,14 @@ class ClassifyLSTM(k.Model):
         self.type = "classifier"
 
         self.optimizer = k.optimizers.Adam(3e-3)
-        self.batch_size = 100
-        self.embedding_size = 20
+        self.batch_size = 50
+        self.embedding_size = 96
 
-        # TODO: set up layers here
-        self.rnn = tf.keras.layers.GRU(self.embedding_size, return_sequences=True, return_state=True)
-        self.dense1 = tf.keras.layers.Dense(self.embedding_size, activation='relu')
-        self.dense2 = tf.keras.layers.Dense(self.num_accent_classes, activation='softmax')
+        # Set up layers here
+        self.rnn = k.layers.GRU(self.embedding_size, return_sequences=True, return_state=True)
+        self.batch_norm = k.layers.BatchNormalization()
+        self.dropout = k.layers.Dropout(0.2)
+        self.dense = k.layers.Dense(self.num_accent_classes)
 
     @tf.function
     def call(self, inputs):
@@ -27,8 +28,9 @@ class ClassifyLSTM(k.Model):
         :param inputs: Tensor or np array of size (batchSize, ..., ..., 1?)
         :return: Tensor of size (batchSize, numAccents)
         """
+        inputs = tf.reshape(inputs, (inputs.shape[0], inputs.shape[1], inputs.shape[2]))
         rnn_output, state = self.rnn(inputs)
-        return self.dense2(self.dense1(state))
+        return self.dense(self.dropout(self.batch_norm(state)))
 
     def get_class(self, inputs):
         """
@@ -48,7 +50,7 @@ class ClassifyLSTM(k.Model):
         :return: 0-1 accuracy value
         """
         predictions = tf.argmax(self.call(inputs), axis=1)
-        return tf.reduce_mean(predictions == labels)
+        return tf.reduce_mean(tf.cast(predictions == labels, tf.float32))
 
     def loss(self, inputs, labels):
         """
