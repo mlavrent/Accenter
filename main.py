@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from dataUtil import ioUtil as Io
 from dataUtil import featureExtraction as fExtr
 from dataUtil import processing
-from models.classification.cnn import ClassifyCNN
+from models.classification.cnn import ClassifyCNN, ClassifyGCNN
 from models.classification.lstm import ClassifyLSTM
 
 
@@ -265,10 +265,10 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
         if save_file:
             model.save_weights(save_file, save_format="h5")
 
-    plot_feature(train_acc, test_acc, preprocess_method,
+    plot_feature(train_accs, test_accs, preprocess_method,
                  "Accuracy_CNN_MFCC", epochs, save=True)
 
-    Io.export_audio_data("acc_train.npy", np.asarray(epoch_accs))
+    Io.export_audio_data("acc_train.npy", np.asarray(train_accs))
     Io.export_audio_data("acc_test.npy", np.asarray(test_accs))
 
 
@@ -342,7 +342,7 @@ def init_model(problem_type, model_type, accent_classes, preprocess_method="mfcc
 
     if problem_type == "classify":
         if model_type == "cnn":
-            model = ClassifyCNN(accent_classes)
+            model = ClassifyGCNN(accent_classes)
         elif model_type == "lstm":
             model = ClassifyLSTM(accent_classes)
         else:

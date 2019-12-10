@@ -6,48 +6,48 @@ from tensorflow.keras import Model, Sequential
 from tensorflow.keras.layers import Dense, Flatten, Conv2D, \
     BatchNormalization, MaxPooling2D, Dropout, GRU
 
+
 class ClassifyGCNN(Model):
     def __init__(self, accent_classes):
-        super(ClassifyCNN, self).__init__()
+        super(ClassifyGCNN, self).__init__()
 
         self.accent_classes = np.array(accent_classes)
         self.num_accent_classes = len(accent_classes)
         self.type = "classifier"
 
-        self.optimizer = k.optimizers.Adam(3e-3)
+        self.optimizer = k.optimizers.Adam(1e-3)
         self.batch_size = 100
         self.embedding_size = 96
 
         self.CNN = Sequential()
         self.CNN.add(Conv2D(16, (3, 3), strides=(1, 1),
                             padding='same',
-                            kernel_regularizer=k.regularizers.l1_l2(
-                                l1=0.02, l2=0.02), activation='relu'))
+                            kernel_regularizer=k.regularizers.l1_l2(l1=0.01, l2=0.01),
+                            activation='relu'))
         self.CNN.add(BatchNormalization())
         self.CNN.add(MaxPooling2D(pool_size=(2, 2),
                                   padding='valid'))
-        self.CNN.add(Dropout(0.5))
+        self.CNN.add(Dropout(0.4))
 
         self.CNN.add(Conv2D(16, (3, 3), strides=(1, 1),
                             padding='same',
-                            kernel_regularizer=k.regularizers.l1_l2(
-                                l1=0.02, l2=0.02), activation='relu'))
+                            kernel_regularizer=k.regularizers.l1_l2(l1=0.01, l2=0.01),
+                            activation='relu'))
         self.CNN.add(BatchNormalization())
         self.CNN.add(MaxPooling2D(pool_size=(2, 2), padding='valid'))
-        self.CNN.add(Dropout(0.5))
+        self.CNN.add(Dropout(0.4))
 
-        self.RNN = GRU(self.embedding_size, dropout=0.5,
+        self.RNN = GRU(self.embedding_size, dropout=0.4,
                        return_sequences=True, return_state=True)
 
         self.Dense = Sequential()
-        self.Dense.add(Dense(128, activation='relu',
-                             kernel_regularizer=k.regularizers.l1_l2(
-                                 l1=0.02, l2=0.02)))
-        self.Dense.add(Dropout(0.5))
+        # self.Dense.add(Dense(256, activation='relu',
+        #                      kernel_regularizer=k.regularizers.l1_l2(l1=0.01, l2=0.01)))
+        # self.Dense.add(Dropout(0.4))
         self.Dense.add(Dense(self.num_accent_classes, activation='softmax',
-                             kernel_regularizer=k.regularizers.l1_l2(
-                                 l1=0.02, l2=0.02)))
-        @tf.function
+                             kernel_regularizer=k.regularizers.l1_l2(l1=0.01, l2=0.01)))
+
+    @tf.function
     def call(self, inputs):
         """
         Run a forward pass of the CNN classification model.
