@@ -4,11 +4,16 @@ import tensorflow as tf
 import numpy as np
 from matplotlib import pyplot as plt
 
+
 from dataUtil import ioUtil as Io
 from dataUtil import featureExtraction as fExtr
 from dataUtil import processing
 from models.classification.cnn import ClassifyCNN
 from models.classification.lstm import ClassifyLSTM
+
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+gpu_available = tf.test.is_gpu_available()
 
 
 def read_args():
@@ -125,8 +130,8 @@ def get_data_from_dir(data_dir, preprocess_method, subset):
         tens_mean = tf.reduce_mean(tensor)
         return tf.divide(tf.subtract(tensor, tens_mean), tens_stddev)
 
-    inputs = None
-    labels = None
+    inputs = []
+    labels = []
 
     accent_class_folders = [folder for folder in os.listdir(data_dir)
                             if os.path.isdir(os.path.join(data_dir, folder))]
@@ -137,14 +142,50 @@ def get_data_from_dir(data_dir, preprocess_method, subset):
         class_data = Io.read_audio_data(data_file)
         class_labels = np.full((class_data.shape[0]), np.where(model.accent_classes == folder)[0])
 
-        if inputs is not None and labels is not None:
-            inputs = np.concatenate((inputs, class_data))
-            labels = np.concatenate((labels, class_labels))
-        else:
-            inputs = class_data
-            labels = class_labels
+        inputs.append(normalize_tensor(tf.expand_dims(class_data, -1)))
+        labels.append(tf.convert_to_tensor(class_labels))
 
-    return normalize_tensor(tf.expand_dims(inputs, -1)), tf.convert_to_tensor(labels)
+    return inputs, labels
+
+
+def augment_random_noise(inputs):
+    """
+    Adds random noise from N(0,1) to the inputs (already normalized) to augment data.
+    :param inputs: The input batch.
+    :return: The input batch augmented with noise.
+    """
+    return tf.add(inputs, tf.random.normal(inputs.shape, mean=0.0, stddev=0.1))
+
+
+def batch_generator(inputs, labels, batch_size):
+    """
+    Gets batches with equal numbers of examples from each accent class.
+    :param inputs: All of the inputs
+    :param labels: All of the labels
+    :param batch_size: Batch size to return
+    :return:
+    """
+    assert len(inputs) == len(labels)
+
+    dataset_size = sum([inp.shape[0] for inp in inputs])
+    num_batches = dataset_size // batch_size
+    num_classes = len(inputs)
+
+    for b in range(num_batches):
+        # Get an equal number of samples from each accent class
+        batch_inputs = None
+        batch_labels = None
+        for ac in range(num_classes):
+            indeces = tf.random.shuffle(tf.range(len(inputs[ac])))[:batch_size // num_classes]
+
+            if batch_inputs is not None and batch_labels is not None:
+                batch_inputs = tf.concat((batch_inputs, tf.gather(inputs[ac], indeces)), 0)
+                batch_labels = tf.concat((batch_labels, tf.gather(labels[ac], indeces)), 0)
+            else:
+                batch_inputs = tf.gather(inputs[ac], indeces)
+                batch_labels = tf.gather(labels[ac], indeces)
+
+        yield tf.convert_to_tensor(batch_inputs), tf.convert_to_tensor(batch_labels)
 
 
 def augment_random_noise(inputs):
@@ -168,32 +209,32 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
     :return: The trained model
     """
 
-    train_inputs, train_labels = get_data_from_dir(train_data_dir, preprocess_method, "train")
-    test_inputs, test_labels = get_data_from_dir(train_data_dir, preprocess_method, "test")
+    c_train_inputs, c_train_labels = get_data_from_dir(train_data_dir, preprocess_method, "train")
 
-    # train_inputs = tf.concat([train_inputs, augment_random_noise(train_inputs)], 0)
-    # train_labels = tf.concat([train_labels, train_labels], 0)
+    assert c_train_inputs is not None
+    assert c_train_labels is not None
+    assert len(c_train_inputs) > 0 and len(c_train_labels) > 0
 
-    assert train_inputs is not None
-    assert train_labels is not None
-    assert train_inputs.shape[0] == train_labels.shape[0]
-    dataset_size = train_labels.shape[0]
+    train_inputs = c_train_inputs[0]
+    train_labels = c_train_labels[0]
+    for c in range(1, len(c_train_inputs)):
+        train_inputs = tf.concat([train_inputs, c_train_inputs[c]], 0)
+        train_labels = tf.concat([train_labels, c_train_labels[c]], 0)
+
+    dataset_size = sum([len(inp) for inp in c_train_inputs])
     print(f"Training on {dataset_size} examples")
+
+    train_accs = []
+    test_accs = []
+
     epoch_loss = model.loss(train_inputs, train_labels)
     epoch_acc = model.accuracy(train_inputs, train_labels)
-    epoch_acc_test = model.accuracy(test_inputs, test_labels)
-
-    print(f"Baseline_Train | Loss: {epoch_loss:.3f} | Accuracy: {epoch_acc:.3f},"
-          f" {epoch_acc_test:.3f}")
-
-    train_loss = np.zeros([epochs + 1])
-    train_acc = np.zeros([epochs + 1])
-    test_acc = np.zeros([epochs + 1])
-
-    train_loss[0] = epoch_loss
-    train_acc[0] = epoch_acc
-    test_acc[0] = epoch_acc_test
-
+    test_acc = test(model, train_data_dir, preprocess_method=preprocess_method)
+    train_accs.append(epoch_acc)
+    test_accs.append(test_acc)
+    print(f"Baseline | Loss: {epoch_loss:.3f} | Train acc: {epoch_acc:.3f} | "
+          f"Test Acc: {test_acc:.3f}")
+    
     for e in range(epochs):
         # Shuffle the dataset before each epoch
         new_order = tf.random.shuffle(tf.range(dataset_size))
@@ -201,9 +242,8 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
         train_labels = tf.gather(train_labels, new_order)
 
         # Run training in batches
-        for batch_start in range(0, dataset_size, model.batch_size):
-            batch_inputs = train_inputs[batch_start:batch_start + model.batch_size]
-            batch_labels = train_labels[batch_start:batch_start + model.batch_size]
+        for batch_inputs, batch_labels in \
+                batch_generator(c_train_inputs, c_train_labels, model.batch_size):
 
             with tf.GradientTape() as tape:
                 loss = model.loss(batch_inputs, batch_labels)
@@ -214,35 +254,28 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
         # Print loss and accuracy
         epoch_loss = model.loss(train_inputs, train_labels)
         epoch_acc = model.accuracy(train_inputs, train_labels)
-        epoch_acc_test = model.accuracy(test_inputs, test_labels)
 
-        train_loss[e+1] = epoch_loss
-        train_acc[e+1] = epoch_acc
-        test_acc[e+1] = epoch_acc_test
-
-        print(f"Epoch {e}/{epochs} | Loss: {epoch_loss:.3f}"
-              f"| Accuracy: {epoch_acc:.3f}, {epoch_acc_test:.3f}")
+        test_acc = test(model, train_data_dir, preprocess_method=preprocess_method)
+        train_accs.append(epoch_acc)
+        test_accs.append(test_acc)
+        print(f"Epoch {e + 1}/{epochs} | Loss: {epoch_loss:.3f} | Accuracy: {epoch_acc:.3f} | "
+              f"Test acc: {test_acc:.3f}")
 
         # Save the model at the end of the epoch
         if save_file:
             model.save_weights(save_file, save_format="h5")
 
-        plot_feature(train_acc, test_acc, preprocess_method,
-                     "Accuracy_CNN_MFCC", epochs)
-
     plot_feature(train_acc, test_acc, preprocess_method,
                  "Accuracy_CNN_MFCC", epochs, save=True)
 
-    Io.export_audio_data("loss_train.npy", np.asarray(train_loss))
-    Io.export_audio_data("acc_train.npy", np.asarray(train_acc))
-
-    Io.export_audio_data("acc_test.npy", np.asarray(test_acc))
+    Io.export_audio_data("acc_train.npy", np.asarray(epoch_accs))
+    Io.export_audio_data("acc_test.npy", np.asarray(test_accs))
 
 
 def plot_feature(train_data, test_data, preprocess_method, title, epochs,
                  save=False):
-    plt.plot(np.arange(0, epochs + 1).tolist(), train_data, '-b', label='train')
-    plt.plot(np.arange(0, epochs + 1).tolist(), test_data, '-c', label='test')
+    plt.plot(range(0, epochs + 1), train_data, label='train')
+    plt.plot(range(0, epochs + 1), test_data, label='test')
 
     plt.xlabel("n epoch")
     plt.legend(loc='upper right')
@@ -260,8 +293,18 @@ def test(model, test_data_dir, preprocess_method="mfcc"):
     :param preprocess_method: The method to use for preprocessing (mfcc | spectrogram)
     :return: The accuracy on the test dataset.
     """
-    test_inputs, test_labels = get_data_from_dir(test_data_dir, preprocess_method, "test")
-    return model.accuracy(test_inputs, test_labels)
+    inputs, labels = get_data_from_dir(test_data_dir, preprocess_method, "test")
+    assert len(inputs) == len(labels)
+
+    num_correct = []
+    total_examples = 0
+    for c in range(len(inputs)):
+        c_inputs = inputs[c]
+        c_labels = labels[c]
+        num_correct.append(model.accuracy(c_inputs, c_labels) * c_inputs.shape[0])
+        total_examples += c_inputs.shape[0]
+
+    return sum(num_correct) / total_examples
 
 
 def classify_accent(model, input_audio, preprocess_method="mfcc"):
@@ -306,9 +349,9 @@ def init_model(problem_type, model_type, accent_classes, preprocess_method="mfcc
             raise Exception("Invalid model type for classify. Must be either cnn or lstm")
 
         if preprocess_method == "mfcc":
-            input_shape = (10, 44, 49, 1)
+            input_shape = (model.batch_size, 44, 49, 1)
         elif preprocess_method == "spectrogram":
-            input_shape = (10, 98, 70, 1)
+            input_shape = (model.batch_size, 98, 70, 1)
         else:
             raise Exception("Invalid preprocessing method. Must be either mfcc or spectrogram")
 
@@ -324,9 +367,11 @@ def init_model(problem_type, model_type, accent_classes, preprocess_method="mfcc
 
 if __name__ == "__main__":
     args = read_args()
+    
+    accent_classes = ["american", "chinese", "korean"]
+    preprocess_method = "mfcc"
+    model = init_model("classify", "cnn", accent_classes, preprocess_method=preprocess_method)
 
-    accent_classes = ["chinese", "american", "korean"]
-    model = init_model("classify", "cnn", accent_classes, preprocess_method="mfcc")
 
     if args.command == "segment":
         # Create output directories if they don't exist
@@ -342,14 +387,17 @@ if __name__ == "__main__":
         fExtr.extract_audio_directory(args.processed_dir, testing=False)
 
     elif args.command == "train":
+        print(f"GPU available: {gpu_available}")
         # Load the saved model or create directory if doesn't exist
         if os.path.exists(args.model_file):
             model.load_weights(args.model_file)
         elif not os.path.exists(os.path.dirname(args.model_file)):
             os.makedirs(os.path.dirname(args.model_file))
 
-        train(model, args.epochs, args.data_dir,
-              save_file=args.model_file, preprocess_method="mfcc")
+        # Train on gpu if it's available
+        with tf.device("/device:" + ("GPU:0" if gpu_available else "CPU:0")):
+            train(model, args.epochs, args.data_dir,
+                  save_file=args.model_file, preprocess_method=preprocess_method)
 
     elif args.command == "test":
         print(f"Testing {args.data_dir}")
