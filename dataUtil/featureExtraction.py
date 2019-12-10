@@ -119,7 +119,7 @@ def extract_audio_directory(path, testing=False):
         print("Running FFT")
         _, _, spectrogram = get_fft(data, SAMPLE_RATE, testing=testing)
         print("Running MFCC")
-        mfccs = get_mfcc(data, SAMPLE_RATE, NUM_FFC, p.stem, testing=testing)
+        mfccs = get_mfcc(data, SAMPLE_RATE, NUM_MFCC, p.stem, testing=testing)
 
         # Get end index for train using test_fraction
         end_train_spectro = int(len(spectrogram) * (1 - TEST_FRACTION))
@@ -146,12 +146,16 @@ def segment_and_extract(filepath):
         return None, None
     data = flatten_audio_channels(processed)
     _, _, spectrogram = get_fft(data, SAMPLE_RATE)
-    mfccs = get_mfcc(data, SAMPLE_RATE, NUM_FFC)
+    mfccs = get_mfcc(data, SAMPLE_RATE, NUM_MFCC, "NA")
     return spectrogram, mfccs
 
 
 def main():
     a = extract_audio_directory("./data/processed", testing=False)
+    f = open("results.txt", 'w')
+    for k, v, in a.items():
+        f.write(f"{k.capitalize()}\n")
+        f.write(f"{v.shape}\n")
 
     # for k, v, in a.items():
     #     print(k.capitalize())

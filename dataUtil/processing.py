@@ -154,7 +154,6 @@ def process_audio_file(filepath, label, silence_length, silence_thresh,
         # Segment audio data by non_silent_ranges
         segmented = segment_audio_clips(data, non_silent_ranges, SAMPLE_RATE)
         # io.plot_audio_segment(SAMPLE_RATE, data, non_silent_ranges)
-        # if testing:
         if testing:
             io.export_segmented_audio_wav(segmented, path.stem, label,
                                           SAMPLE_RATE)
@@ -262,7 +261,6 @@ def resample_wav_dir(path, testing=False):
 
 
 def main():
-    # resample_wav_dir("./data/raw/british", testing=False)
     a = process_audio_directory("./data/raw", testing=False)
 
     for k, v, in a.items():
