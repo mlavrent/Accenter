@@ -2,8 +2,12 @@ import tensorflow as tf
 import tensorflow.keras as k
 import numpy as np
 
+from tensorflow.keras import Model, Sequential
+from tensorflow.keras.layers import Dense, Flatten, Conv2D, \
+    BatchNormalization, MaxPooling2D, Dropout, GRU
 
-class ClassifyCNN(k.Model):
+
+class ClassifyCNN(Model):
     def __init__(self, accent_classes):
         super(ClassifyCNN, self).__init__()
 
@@ -13,59 +17,55 @@ class ClassifyCNN(k.Model):
 
         self.optimizer = k.optimizers.Adam(3e-3)
         self.batch_size = 100
+        self.embedding_size = 96
 
-        self.conv1 = k.layers.Conv2D(filters=8,
-                                     kernel_size=(3, 3),
-                                     strides=(1, 1),
-                                     padding="SAME",
-                                     activation=k.layers.LeakyReLU(0.2),
-                                     use_bias=True,
-                                     kernel_initializer=k.initializers.TruncatedNormal(stddev=0.1))
-        self.conv2 = k.layers.Conv2D(filters=16,
-                                     kernel_size=(4, 4),
-                                     strides=(2, 2),
-                                     padding="SAME",
-                                     activation=k.layers.LeakyReLU(0.2),
-                                     use_bias=True,
-                                     kernel_initializer=k.initializers.TruncatedNormal(stddev=0.1))
-        self.conv3 = k.layers.Conv2D(filters=32,
-                                     kernel_size=(4, 4),
-                                     strides=(2, 2),
-                                     padding="SAME",
-                                     activation=k.layers.LeakyReLU(0.2),
-                                     use_bias=True,
-                                     kernel_initializer=k.initializers.TruncatedNormal(stddev=0.1))
-        self.flatten = k.layers.Flatten()
+        self.CNN = Sequential()
+        self.CNN.add(Conv2D(16, (3, 3), strides=(1, 1),
+                            padding='same',
+                            kernel_regularizer=k.regularizers.l1_l2(
+                                l1=0.02, l2=0.02), activation='relu'))
+        self.CNN.add(BatchNormalization())
+        self.CNN.add(MaxPooling2D(pool_size=(2, 2),
+                                  padding='valid'))
+        self.CNN.add(Dropout(0.5))
 
-        self.dense1 = k.layers.Dense(units=256,
-                                     activation=k.layers.LeakyReLU(0.2),
-                                     use_bias=True,
-                                     kernel_initializer=k.initializers.TruncatedNormal(stddev=0.1))
-        self.dense2 = k.layers.Dense(units=self.num_accent_classes,
-                                     use_bias=True,
-                                     kernel_initializer=k.initializers.TruncatedNormal(stddev=0.1))
+        self.CNN.add(Conv2D(16, (3, 3), strides=(1, 1),
+                            padding='same',
+                            kernel_regularizer=k.regularizers.l1_l2(
+                                l1=0.02, l2=0.02), activation='relu'))
+        self.CNN.add(BatchNormalization())
+        self.CNN.add(MaxPooling2D(pool_size=(2, 2), padding='valid'))
+        self.CNN.add(Dropout(0.5))
+
+        self.RNN = GRU(self.embedding_size, dropout=0.5,
+                       return_sequences=True, return_state=True)
+
+        self.Dense = Sequential()
+        self.Dense.add(Dense(128, activation='relu',
+                             kernel_regularizer=k.regularizers.l1_l2(
+                                 l1=0.02, l2=0.02)))
+        self.Dense.add(Dropout(0.5))
+        self.Dense.add(Dense(self.num_accent_classes, activation='softmax',
+                             kernel_regularizer=k.regularizers.l1_l2(
+                                 l1=0.02, l2=0.02)))
 
     @tf.function
     def call(self, inputs):
         """
         Run a forward pass of the CNN classification model.
         :param inputs: Tensor or np array of size (batchSize, ..., ..., 1?)
-        :return: Tensor of size (batchSize, numAccents) containing logits
+        :return: Tensor of size (batchSize, numAccents) containing probabilities
         """
-        cur_calc = self.conv1(inputs)
-        cur_calc = self.conv2(cur_calc)
-        cur_calc = self.conv3(cur_calc)
-        cur_calc = self.flatten(cur_calc)
+        cnn_out = self.CNN(inputs)
+        cnn_out = tf.reshape(cnn_out, [inputs.shape[0], cnn_out.shape[1], -1])
+        _, state = self.RNN(cnn_out)
 
-        cur_calc = self.dense1(cur_calc)
-        cur_calc = self.dense2(cur_calc)
-
-        return cur_calc
+        return self.Dense(state)
 
     def get_class(self, inputs):
         """
-        Given inputs, gets the class that is most likely (highest prob) for each.
-        Useful for evaluation.
+        Given inputs, gets the class that is most likely (highest prob) for
+        each. Useful for evaluation.
         :param inputs: A list of inputs to predict class for
         :return: The accent class that is most likely for the input
         """
@@ -74,7 +74,8 @@ class ClassifyCNN(k.Model):
 
     def accuracy(self, inputs, labels):
         """
-        Given inputs and sparse labels (indices), calculates the accuracy of predictions.
+        Given inputs and sparse labels (indices), calculates the accuracy of
+        predictions.
         :param inputs: Batch of model inputs.
         :param labels: Batch of sparse label indices (1d tensor)
         :return: 0-1 accuracy value
@@ -86,8 +87,10 @@ class ClassifyCNN(k.Model):
         """
         Calculates the loss for some batch of input-label pairs.
         :param inputs: Tensor of size (batchSize, ..., ..., 1?)
-        :param labels: Tensor of size (batchSize, 1) - sparse labels indicating index of accent
+        :param labels: Tensor of size (batchSize, 1) - sparse labels indicating
+                        index of accent
         :return: The average loss over this batch.
         """
-        logits = self.call(inputs)
-        return tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels, logits))
+        probabilities = self.call(inputs)
+        return tf.reduce_mean(
+            k.losses.sparse_categorical_crossentropy(labels, probabilities))
