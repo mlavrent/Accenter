@@ -41,9 +41,9 @@ class ClassifyGCNN(Model):
                        return_sequences=True, return_state=True)
 
         self.Dense = Sequential()
-        # self.Dense.add(Dense(256, activation='relu',
-        #                      kernel_regularizer=k.regularizers.l1_l2(l1=0.01, l2=0.01)))
-        # self.Dense.add(Dropout(0.4))
+        self.Dense.add(Dense(256, activation='relu',
+                             kernel_regularizer=k.regularizers.l1_l2(l1=0.01, l2=0.01)))
+        self.Dense.add(Dropout(0.4))
         self.Dense.add(Dense(self.num_accent_classes, activation='softmax',
                              kernel_regularizer=k.regularizers.l1_l2(l1=0.01, l2=0.01)))
 
