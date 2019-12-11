@@ -8,10 +8,10 @@ from pathlib import Path
 from librosa.display import specshow
 from librosa.feature import mfcc
 from scipy.signal import spectrogram as spectro
-from processing import process_audio_file, flatten_audio_channels
+from dataUtil.processing import process_audio_file, flatten_audio_channels
 
-from constants import *
-import ioUtil as io
+from dataUtil.constants import *
+import dataUtil.ioUtil as io
 
 
 def get_fft(signal, sampling_frequency, testing=False):
