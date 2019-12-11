@@ -199,7 +199,7 @@ def augment_random_noise(inputs):
     return tf.add(inputs, tf.random.normal(inputs.shape, mean=0.0, stddev=1.0))
 
 
-def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc"):
+def train(model, epochs, train_data_dir, acc_cls=None, save_file=None, preprocess_method="mfcc"):
     """
     Trains the model on the given training data, checkpointing the weights to the given file
     after every epoch.
@@ -231,7 +231,7 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
 
     epoch_loss = model.loss(train_inputs, train_labels)
     epoch_acc = model.accuracy(train_inputs, train_labels)
-    test_acc = test(model, train_data_dir, preprocess_method=preprocess_method)
+    test_acc = test(model, train_data_dir, acc_cls=acc_cls, preprocess_method=preprocess_method)
     train_accs.append(epoch_acc)
     test_accs.append(test_acc)
     print(f"Baseline | Loss: {epoch_loss:.3f} | Train acc: {epoch_acc:.3f} | "
@@ -257,7 +257,7 @@ def train(model, epochs, train_data_dir, save_file=None, preprocess_method="mfcc
         epoch_loss = model.loss(train_inputs, train_labels)
         epoch_acc = model.accuracy(train_inputs, train_labels)
 
-        test_acc = test(model, train_data_dir, preprocess_method=preprocess_method)
+        test_acc = test(model, train_data_dir, acc_cls=acc_cls, preprocess_method=preprocess_method)
         train_accs.append(epoch_acc)
         test_accs.append(test_acc)
         print(f"Epoch {e + 1}/{epochs} | Loss: {epoch_loss:.3f} | Accuracy: {epoch_acc:.3f} | "
@@ -360,7 +360,7 @@ def init_model(problem_type, model_type, accent_classes, preprocess_method="mfcc
 
     if problem_type == "classify":
         if model_type == "cnn":
-            model = ClassifyGCNN(accent_classes)
+            model = ClassifyCNN(accent_classes)
         elif model_type == "lstm":
             model = ClassifyLSTM(accent_classes)
         else:
@@ -414,7 +414,7 @@ if __name__ == "__main__":
 
         # Train on gpu if it's available
         with tf.device("/device:" + ("GPU:0" if gpu_available else "CPU:0")):
-            train(model, args.epochs, args.data_dir,
+            train(model, args.epochs, args.data_dir, acc_cls=accent_classes,
                   save_file=args.model_file, preprocess_method=preprocess_method)
 
     elif args.command == "test":
