@@ -3,6 +3,8 @@ import os
 import tensorflow as tf
 import numpy as np
 from matplotlib import pyplot as plt
+import seaborn as sn
+import pandas as pd
 
 
 from dataUtil import ioUtil as Io
@@ -285,26 +287,42 @@ def plot_feature(train_data, test_data, preprocess_method, title, epochs,
     plt.show()
 
 
-def test(model, test_data_dir, preprocess_method="mfcc"):
+def test(model, test_data_dir, preprocess_method="mfcc", show_confusion_mat=False, acc_cls=None):
     """
     Runs the model on the test dataset and reports the accuracy on it.
     :param model: The model to run the test dataset on.
     :param test_data_dir: The data directory of the test data.
     :param preprocess_method: The method to use for preprocessing (mfcc | spectrogram)
+    :param show_confusion_mat: Whether to show the confusion matrix.
+    :param acc_cls: The accent classes to use for the confusion matrix.
     :return: The accuracy on the test dataset.
     """
-    inputs, labels = get_data_from_dir(test_data_dir, preprocess_method, "test")
-    assert len(inputs) == len(labels)
+    acc_cls = [cls.capitalize() for cls in acc_cls]
+    c_test_inputs, c_test_labels = get_data_from_dir(test_data_dir, preprocess_method, "test")
+    assert len(c_test_inputs) == len(c_test_labels)
 
-    num_correct = []
-    total_examples = 0
-    for c in range(len(inputs)):
-        c_inputs = inputs[c]
-        c_labels = labels[c]
-        num_correct.append(model.accuracy(c_inputs, c_labels) * c_inputs.shape[0])
-        total_examples += c_inputs.shape[0]
+    test_inputs = c_test_inputs[0]
+    test_labels = c_test_labels[0]
+    for c in range(1, len(c_test_inputs)):
+        test_inputs = tf.concat([test_inputs, c_test_inputs[c]], 0)
+        test_labels = tf.concat([test_labels, c_test_labels[c]], 0)
 
-    return sum(num_correct) / total_examples
+    if show_confusion_mat:
+        predictions = tf.argmax(model.call(test_inputs), axis=1)
+        conf_mat = tf.math.confusion_matrix(test_labels, predictions).numpy()
+        dataframe = pd.DataFrame(conf_mat, acc_cls, acc_cls)
+
+        model_name = "CNN + RNN"
+        plt.figure(figsize=(3.8, 3.8))
+        sn.heatmap(dataframe, annot=True, cmap="Blues", cbar=False, fmt="g")
+        plt.title(model_name)
+        plt.ylabel("True Accent Class")
+        plt.xlabel("Predicted Accent Class")
+        plt.savefig(f"{model_name}.png")
+        plt.show()
+
+
+    return model.accuracy(test_inputs, test_labels)
 
 
 def classify_accent(model, input_audio, preprocess_method="mfcc"):
@@ -402,7 +420,7 @@ if __name__ == "__main__":
     elif args.command == "test":
         print(f"Testing {args.data_dir}")
         model.load_weights(args.saved_model)
-        accuracy = test(model, args.data_dir)
+        accuracy = test(model, args.data_dir, show_confusion_mat=True, acc_cls=accent_classes)
         print(f"Accuracy: {accuracy*100:.1f}%")
 
     elif args.command == "run":
