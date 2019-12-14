@@ -112,7 +112,7 @@ def read_args():
     return parser.parse_args()
 
 
-def get_data_from_dir(data_dir, preprocess_method, subset):
+def get_data_from_dir(data_dir, preprocess_method, subset, acc_cls):
     """
     Loads the data from a given data directory, giving back both inputs and labels
     :param data_dir: The directory to load data from
@@ -135,10 +135,9 @@ def get_data_from_dir(data_dir, preprocess_method, subset):
     inputs = []
     labels = []
 
-    accent_class_folders = [folder for folder in os.listdir(data_dir)
-                            if os.path.isdir(os.path.join(data_dir, folder))]
-    for folder in accent_class_folders:
+    for folder in acc_cls:
         assert folder in model.accent_classes
+        assert os.path.exists(os.path.join(data_dir, folder))
 
         data_file = os.path.join(data_dir, folder, f"{folder}-{preprocess_method}-{subset}.npy")
         class_data = Io.read_audio_data(data_file)
@@ -199,7 +198,7 @@ def augment_random_noise(inputs):
     return tf.add(inputs, tf.random.normal(inputs.shape, mean=0.0, stddev=1.0))
 
 
-def train(model, epochs, train_data_dir, acc_cls=None, save_file=None, preprocess_method="mfcc"):
+def train(model, epochs, train_data_dir, acc_cls, save_file=None, preprocess_method="mfcc"):
     """
     Trains the model on the given training data, checkpointing the weights to the given file
     after every epoch.
@@ -211,7 +210,7 @@ def train(model, epochs, train_data_dir, acc_cls=None, save_file=None, preproces
     :return: The trained model
     """
 
-    c_train_inputs, c_train_labels = get_data_from_dir(train_data_dir, preprocess_method, "train")
+    c_train_inputs, c_train_labels = get_data_from_dir(train_data_dir, preprocess_method, "train", acc_cls)
 
     assert c_train_inputs is not None
     assert c_train_labels is not None
@@ -231,7 +230,7 @@ def train(model, epochs, train_data_dir, acc_cls=None, save_file=None, preproces
 
     epoch_loss = model.loss(train_inputs, train_labels)
     epoch_acc = model.accuracy(train_inputs, train_labels)
-    test_acc = test(model, train_data_dir, acc_cls=acc_cls, preprocess_method=preprocess_method)
+    test_acc = test(model, train_data_dir, acc_cls, preprocess_method=preprocess_method)
     train_accs.append(epoch_acc)
     test_accs.append(test_acc)
     print(f"Baseline | Loss: {epoch_loss:.3f} | Train acc: {epoch_acc:.3f} | "
@@ -257,7 +256,7 @@ def train(model, epochs, train_data_dir, acc_cls=None, save_file=None, preproces
         epoch_loss = model.loss(train_inputs, train_labels)
         epoch_acc = model.accuracy(train_inputs, train_labels)
 
-        test_acc = test(model, train_data_dir, acc_cls=acc_cls, preprocess_method=preprocess_method)
+        test_acc = test(model, train_data_dir, acc_cls, preprocess_method=preprocess_method)
         train_accs.append(epoch_acc)
         test_accs.append(test_acc)
         print(f"Epoch {e + 1}/{epochs} | Loss: {epoch_loss:.3f} | Accuracy: {epoch_acc:.3f} | "
@@ -287,7 +286,7 @@ def plot_feature(train_data, test_data, preprocess_method, title, epochs,
     plt.show()
 
 
-def test(model, test_data_dir, preprocess_method="mfcc", show_confusion_mat=False, acc_cls=None):
+def test(model, test_data_dir, acc_cls, preprocess_method="mfcc", show_confusion_mat=False):
     """
     Runs the model on the test dataset and reports the accuracy on it.
     :param model: The model to run the test dataset on.
@@ -297,8 +296,7 @@ def test(model, test_data_dir, preprocess_method="mfcc", show_confusion_mat=Fals
     :param acc_cls: The accent classes to use for the confusion matrix.
     :return: The accuracy on the test dataset.
     """
-    acc_cls = [cls.capitalize() for cls in acc_cls]
-    c_test_inputs, c_test_labels = get_data_from_dir(test_data_dir, preprocess_method, "test")
+    c_test_inputs, c_test_labels = get_data_from_dir(test_data_dir, preprocess_method, "test", acc_cls)
     assert len(c_test_inputs) == len(c_test_labels)
 
     test_inputs = c_test_inputs[0]
@@ -308,6 +306,7 @@ def test(model, test_data_dir, preprocess_method="mfcc", show_confusion_mat=Fals
         test_labels = tf.concat([test_labels, c_test_labels[c]], 0)
 
     if show_confusion_mat:
+        acc_cls = [cls.capitalize() for cls in acc_cls]
         predictions = tf.argmax(model.call(test_inputs), axis=1)
         conf_mat = tf.math.confusion_matrix(test_labels, predictions).numpy()
         dataframe = pd.DataFrame(conf_mat, acc_cls, acc_cls)
@@ -336,12 +335,12 @@ def classify_accent(model, input_audio, preprocess_method="mfcc"):
     if model.type == "classifier":
         spectrogram, mfccs = fExtr.segment_and_extract(input_audio)
         if preprocess_method == "mfcc":
-            input_data = mfccs
+            input_data = tf.expand_dims(mfccs, -1)
         elif preprocess_method == "spectrogram":
-            input_data = spectrogram
+            input_data = tf.expand_dims(spectrogram, -1)
         else:
             raise Exception("Invalid preprocessing method specified")
-        return model.get_class([input_data])
+        return tf.reduce_mean(model.call(input_data), axis=0)
     elif model.type == "converter":
         raise Exception("Model not implemented")
     else:
@@ -414,13 +413,13 @@ if __name__ == "__main__":
 
         # Train on gpu if it's available
         with tf.device("/device:" + ("GPU:0" if gpu_available else "CPU:0")):
-            train(model, args.epochs, args.data_dir, acc_cls=accent_classes,
+            train(model, args.epochs, args.data_dir, accent_classes,
                   save_file=args.model_file, preprocess_method=preprocess_method)
 
     elif args.command == "test":
         print(f"Testing {args.data_dir}")
         model.load_weights(args.saved_model)
-        accuracy = test(model, args.data_dir, show_confusion_mat=True, acc_cls=accent_classes)
+        accuracy = test(model, args.data_dir, accent_classes, show_confusion_mat=True)
         print(f"Accuracy: {accuracy*100:.1f}%")
 
     elif args.command == "run":
